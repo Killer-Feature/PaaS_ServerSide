@@ -1,11 +1,11 @@
 package ssh
 
 import (
-	cc "KillerFeature/ServerSide/internal/client_conn"
-	models "KillerFeature/ServerSide/internal/models"
-	"fmt"
 	"net"
+	"strconv"
 	"time"
+
+	cc "KillerFeature/ServerSide/internal/client_conn"
 
 	"github.com/pkg/errors"
 
@@ -17,10 +17,10 @@ const (
 )
 
 var (
-	ErrorCreateCCEmptyCreds = errors.New("empty user or password passed")
-	ErrorCreateCCEmptyAddr  = errors.New("empty address or port passed")
-	ErrorDialCConn          = errors.New("starting ssh client connection error")
-	ErrorOpenNewSession     = errors.New("opening new session error")
+	ErrorCreateCCEmptyCreds  = errors.New("empty user or password passed")
+	ErrorCreateCCInvalidAddr = errors.New("invalid address or port passed")
+	ErrorDialCConn           = errors.New("starting ssh client connection error")
+	ErrorOpenNewSession      = errors.New("opening new session error")
 )
 
 type SSHBuilder struct {
@@ -39,13 +39,12 @@ func getHostKeyCallback() ssh.HostKeyCallback {
 	return ssh.InsecureIgnoreHostKey()
 }
 
-func (b *SSHBuilder) CreateCC(creds *models.SshCreds) (cc.ClientConn, error) {
-	fmt.Println("~~", creds)
-	if creds.User == "" || creds.Password == "" {
+func (b *SSHBuilder) CreateCC(creds *cc.Creds) (cc.ClientConn, error) {
+	if creds.Login == "" || creds.Password == "" {
 		return nil, ErrorCreateCCEmptyCreds
 	}
-	if creds.IP == "" || creds.Port == "" {
-		return nil, ErrorCreateCCEmptyAddr
+	if !creds.IP.IsValid() {
+		return nil, ErrorCreateCCInvalidAddr
 	}
 
 	hostKeyCallback := getHostKeyCallback()
@@ -54,7 +53,7 @@ func (b *SSHBuilder) CreateCC(creds *models.SshCreds) (cc.ClientConn, error) {
 	authSlice = append(authSlice, ssh.Password(creds.Password))
 
 	clientConfig := ssh.ClientConfig{
-		User: creds.User,
+		User: creds.Login,
 		Auth: authSlice,
 		HostKeyAlgorithms: []string{
 			ssh.CertAlgoRSASHA256v01,
@@ -70,7 +69,7 @@ func (b *SSHBuilder) CreateCC(creds *models.SshCreds) (cc.ClientConn, error) {
 		HostKeyCallback: hostKeyCallback,
 		Timeout:         time.Second * SSH_CCONN_TIMEOUT,
 	}
-	dial, err := ssh.Dial("tcp", net.JoinHostPort(creds.IP, creds.Port), &clientConfig)
+	dial, err := ssh.Dial("tcp", net.JoinHostPort(creds.IP.Addr().String(), strconv.Itoa(int(creds.IP.Port()))), &clientConfig)
 	if err != nil {
 		return nil, ErrorDialCConn
 	}
@@ -87,8 +86,9 @@ func (b *SSHBuilder) CreateCC(creds *models.SshCreds) (cc.ClientConn, error) {
 
 func (s *SSH) Exec(comand string) ([]byte, error) {
 	// TODO: сделать асинхронный деплой приложения
-	output, err := s.S.Output("ls")
-	fmt.Println(string(output))
+	output, err := s.S.Output(comand)
+
+	// fmt.Println(string(output))
 	return output, err
 }
 

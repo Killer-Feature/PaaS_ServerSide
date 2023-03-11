@@ -7,7 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	echo "github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/sync/errgroup"
@@ -15,6 +15,7 @@ import (
 	"KillerFeature/ServerSide/internal/client_conn/ssh"
 	"KillerFeature/ServerSide/internal/handlers"
 	"KillerFeature/ServerSide/internal/service"
+	"KillerFeature/ServerSide/pkg/taskmanager"
 )
 
 func main() {
@@ -38,7 +39,9 @@ func main() {
 	ctx := context.Background()
 	g, _ := errgroup.WithContext(ctx)
 
-	u := service.NewService(ssh.NewSSHBuilder())
+	tm := taskmanager.NewTaskManager(ctx)
+
+	u := service.NewService(ssh.NewSSHBuilder(), tm)
 	h := handlers.NewHandler(logger, u)
 	h.Register(server)
 
