@@ -2,15 +2,17 @@ package main
 
 import (
 	"context"
-	"errors"
 	"log"
 	"net/http"
+
+	"github.com/pkg/errors"
 
 	echo "github.com/labstack/echo/v4"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/sync/errgroup"
 
+	"KillerFeature/ServerSide/internal/client_conn/ssh"
 	"KillerFeature/ServerSide/internal/handlers"
 	"KillerFeature/ServerSide/internal/service"
 )
@@ -36,7 +38,7 @@ func main() {
 	ctx := context.Background()
 	g, _ := errgroup.WithContext(ctx)
 
-	u := service.NewService()
+	u := service.NewService(ssh.NewSSHBuilder())
 	h := handlers.NewHandler(logger, u)
 	h.Register(server)
 
