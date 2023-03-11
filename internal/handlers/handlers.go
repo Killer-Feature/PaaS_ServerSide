@@ -39,6 +39,7 @@ func (h *Handler) DeployApp(c echo.Context) error {
 	fmt.Println(req)
 	fmt.Println(h.u.DeployApp(&models.SshCreds{
 		IP:       req.IP,
+		Port:     req.Port,
 		Password: req.Password,
 		User:     req.User,
 	}))

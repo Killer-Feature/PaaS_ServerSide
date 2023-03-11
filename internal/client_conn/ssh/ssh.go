@@ -3,6 +3,7 @@ package ssh
 import (
 	cc "KillerFeature/ServerSide/internal/client_conn"
 	models "KillerFeature/ServerSide/internal/models"
+	"fmt"
 	"net"
 	"time"
 
@@ -39,6 +40,7 @@ func getHostKeyCallback() ssh.HostKeyCallback {
 }
 
 func (b *SSHBuilder) CreateCC(creds *models.SshCreds) (cc.ClientConn, error) {
+	fmt.Println("~~", creds)
 	if creds.User == "" || creds.Password == "" {
 		return nil, ErrorCreateCCEmptyCreds
 	}
@@ -86,6 +88,7 @@ func (b *SSHBuilder) CreateCC(creds *models.SshCreds) (cc.ClientConn, error) {
 func (s *SSH) Exec(comand string) ([]byte, error) {
 	// TODO: сделать асинхронный деплой приложения
 	output, err := s.S.Output("ls")
+	fmt.Println(string(output))
 	return output, err
 }
 
