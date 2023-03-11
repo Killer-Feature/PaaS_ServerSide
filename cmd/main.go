@@ -48,7 +48,7 @@ func main() {
 	//m.Register(server)
 
 	g.Go(func() error {
-		return server.Start(":8090")
+		return server.Start(":8080")
 	})
 
 	if err := g.Wait(); err != nil {

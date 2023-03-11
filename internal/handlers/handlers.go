@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"fmt"
 	"net/http"
 
 	echo "github.com/labstack/echo/v4"
@@ -36,12 +35,11 @@ func (h *Handler) DeployApp(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, HttpErrorBindingParams)
 	}
 	// TODO delete
-	fmt.Println(req)
-	fmt.Println(h.u.DeployApp(&models.SshCreds{
+	h.u.DeployApp(&models.SshCreds{
 		IP:       req.IP,
 		Port:     req.Port,
 		Password: req.Password,
 		User:     req.User,
-	}))
-	return c.HTML(http.StatusOK, "hello")
+	})
+	return c.HTML(http.StatusOK, "")
 }

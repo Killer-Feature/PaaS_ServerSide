@@ -28,7 +28,7 @@ type SSHBuilder struct {
 
 type SSH struct {
 	// C ssh.Client
-	S *ssh.Session
+	C *ssh.Client
 }
 
 func NewSSHBuilder() cc.CCBuilder {
@@ -70,28 +70,25 @@ func (b *SSHBuilder) CreateCC(creds *models.SshCreds) (cc.ClientConn, error) {
 		HostKeyCallback: hostKeyCallback,
 		Timeout:         time.Second * SSH_CCONN_TIMEOUT,
 	}
-	dial, err := ssh.Dial("tcp", net.JoinHostPort(creds.IP, creds.Port), &clientConfig)
+	client, err := ssh.Dial("tcp", net.JoinHostPort(creds.IP, creds.Port), &clientConfig)
 	if err != nil {
 		return nil, ErrorDialCConn
 	}
 
-	session, err := dial.NewSession()
-	if err != nil {
-		return nil, ErrorOpenNewSession
-	}
-
 	return &SSH{
-		S: session,
+		C: client,
 	}, nil
 }
 
-func (s *SSH) Exec(comand string) ([]byte, error) {
-	// TODO: сделать асинхронный деплой приложения
-	output, err := s.S.Output("ls")
-	fmt.Println(string(output))
+func (s *SSH) Exec(command string) ([]byte, error) {
+	session, err := s.C.NewSession()
+	if err != nil {
+		return nil, ErrorOpenNewSession
+	}
+	output, err := session.Output(command)
 	return output, err
 }
 
 func (s *SSH) Close() error {
-	return s.S.Close()
+	return s.C.Close()
 }
