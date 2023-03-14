@@ -4,8 +4,6 @@ import "strings"
 
 type Command string
 
-type Condition uint8
-
 func (c Command) WithArgs(args ...string) Command {
 	return c + " " + Command(strings.Join(args, " "))
 }

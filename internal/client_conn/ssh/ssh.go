@@ -3,11 +3,11 @@ package ssh
 import (
 	cc "KillerFeature/ServerSide/internal/client_conn"
 	models "KillerFeature/ServerSide/internal/models"
-	"fmt"
 	"net"
+	"syscall"
 	"time"
 
-	"github.com/pkg/errors"
+	"errors"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -16,18 +16,10 @@ const (
 	SSH_CCONN_TIMEOUT = 60
 )
 
-var (
-	ErrorCreateCCEmptyCreds = errors.New("empty user or password passed")
-	ErrorCreateCCEmptyAddr  = errors.New("empty address or port passed")
-	ErrorDialCConn          = errors.New("starting ssh client connection error")
-	ErrorOpenNewSession     = errors.New("opening new session error")
-)
-
 type SSHBuilder struct {
 }
 
 type SSH struct {
-	// C ssh.Client
 	C *ssh.Client
 }
 
@@ -35,27 +27,10 @@ func NewSSHBuilder() cc.CCBuilder {
 	return &SSHBuilder{}
 }
 
-func getHostKeyCallback() ssh.HostKeyCallback {
-	return ssh.InsecureIgnoreHostKey()
-}
-
 func (b *SSHBuilder) CreateCC(creds *models.SshCreds) (cc.ClientConn, error) {
-	fmt.Println("~~", creds)
-	if creds.User == "" || creds.Password == "" {
-		return nil, ErrorCreateCCEmptyCreds
-	}
-	if creds.IP == "" || creds.Port == "" {
-		return nil, ErrorCreateCCEmptyAddr
-	}
-
-	hostKeyCallback := getHostKeyCallback()
-
-	var authSlice []ssh.AuthMethod
-	authSlice = append(authSlice, ssh.Password(creds.Password))
-
 	clientConfig := ssh.ClientConfig{
 		User: creds.User,
-		Auth: authSlice,
+		Auth: []ssh.AuthMethod{ssh.Password(creds.Password)},
 		HostKeyAlgorithms: []string{
 			ssh.CertAlgoRSASHA256v01,
 			ssh.CertAlgoRSAv01,
@@ -67,12 +42,17 @@ func (b *SSHBuilder) CreateCC(creds *models.SshCreds) (cc.ClientConn, error) {
 			ssh.KeyAlgoED25519,
 			ssh.CertAlgoED25519v01,
 		},
-		HostKeyCallback: hostKeyCallback,
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		Timeout:         time.Second * SSH_CCONN_TIMEOUT,
 	}
+
 	client, err := ssh.Dial("tcp", net.JoinHostPort(creds.IP, creds.Port), &clientConfig)
 	if err != nil {
-		return nil, ErrorDialCConn
+		var opErrTarget *net.OpError
+		if errors.As(err, &opErrTarget) {
+			return nil, errors.Join(cc.ErrOperation, err)
+		}
+		return nil, errors.Join(cc.ErrSome, err)
 	}
 
 	return &SSH{
@@ -83,12 +63,44 @@ func (b *SSHBuilder) CreateCC(creds *models.SshCreds) (cc.ClientConn, error) {
 func (s *SSH) Exec(command string) ([]byte, error) {
 	session, err := s.C.NewSession()
 	if err != nil {
-		return nil, ErrorOpenNewSession
+		var openChannelErrTarget *ssh.OpenChannelError
+		if errors.As(err, &openChannelErrTarget) {
+			return nil, errors.Join(cc.ErrOpenChannel, err)
+		}
+		return nil, errors.Join(cc.ErrSome, err)
 	}
-	output, err := session.Output(command)
+
+	output, err := session.CombinedOutput(command)
+
+	if err != nil {
+		var exitMissingErrTarget *ssh.ExitMissingError
+		if errors.As(err, &exitMissingErrTarget) {
+			return nil, errors.Join(cc.ErrExitStatusMissing, err)
+		}
+
+		var exitErrTarget *ssh.ExitMissingError
+		if errors.As(err, &exitErrTarget) {
+			return nil, errors.Join(cc.ErrExitStatus, err)
+		}
+
+		return nil, errors.Join(cc.ErrSome, err)
+	}
+
 	return output, err
 }
 
 func (s *SSH) Close() error {
-	return s.C.Close()
+	err := s.C.Close()
+	if err != nil {
+		var opErrTarget *net.OpError
+		if errors.As(err, &opErrTarget) {
+			return errors.Join(cc.ErrOperation, err)
+		}
+		alreadyClosedErrTarget := syscall.EINVAL
+		if errors.As(err, &alreadyClosedErrTarget) {
+			return errors.Join(cc.ErrConnectionAlreadyClosed, err)
+		}
+		return errors.Join(cc.ErrSome, err)
+	}
+	return nil
 }

@@ -11,5 +11,9 @@ type SshDeployAppReq struct {
 	IP       string `json:"ip"`
 	Port     string `json:"port"`
 	User     string `json:"user"`
-	Password string `json:"pass"`
+	Password string `json:"password"`
+}
+
+type SshDeployAppServiceResp struct {
+	Log string
 }

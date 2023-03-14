@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/pkg/errors"
+	"errors"
 
 	echo "github.com/labstack/echo/v4"
 	"go.uber.org/zap"
@@ -48,7 +48,7 @@ func main() {
 	//m.Register(server)
 
 	g.Go(func() error {
-		return server.Start(":8080")
+		return server.Start(":8090")
 	})
 
 	if err := g.Wait(); err != nil {
