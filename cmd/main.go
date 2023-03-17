@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/pkg/errors"
+	"errors"
 
 	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"

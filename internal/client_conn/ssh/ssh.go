@@ -1,14 +1,12 @@
 package ssh
 
 import (
-	"net"
-	"strconv"
-	"time"
-
 	cc "KillerFeature/ServerSide/internal/client_conn"
-
-	"github.com/pkg/errors"
-
+	models "KillerFeature/ServerSide/internal/models"
+	"net"
+	"syscall"
+	"time"
+	"errors"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -16,45 +14,21 @@ const (
 	SSH_CCONN_TIMEOUT = 60
 )
 
-var (
-	ErrorCreateCCEmptyCreds  = errors.New("empty user or password passed")
-	ErrorCreateCCInvalidAddr = errors.New("invalid address or port passed")
-	ErrorDialCConn           = errors.New("starting ssh client connection error")
-	ErrorOpenNewSession      = errors.New("opening new session error")
-)
-
 type SSHBuilder struct {
 }
 
 type SSH struct {
-	// C ssh.Client
-	S *ssh.Session
+	C *ssh.Client
 }
 
 func NewSSHBuilder() cc.CCBuilder {
 	return &SSHBuilder{}
 }
 
-func getHostKeyCallback() ssh.HostKeyCallback {
-	return ssh.InsecureIgnoreHostKey()
-}
-
-func (b *SSHBuilder) CreateCC(creds *cc.Creds) (cc.ClientConn, error) {
-	if creds.Login == "" || creds.Password == "" {
-		return nil, ErrorCreateCCEmptyCreds
-	}
-	if !creds.IP.IsValid() {
-		return nil, ErrorCreateCCInvalidAddr
-	}
-
-	hostKeyCallback := getHostKeyCallback()
-
-	var authSlice []ssh.AuthMethod
-	authSlice = append(authSlice, ssh.Password(creds.Password))
-
+func (b *SSHBuilder) CreateCC(creds *models.SshCreds) (cc.ClientConn, error) {
 	clientConfig := ssh.ClientConfig{
-		User: creds.Login,
-		Auth: authSlice,
+		User: creds.User,
+		Auth: []ssh.AuthMethod{ssh.Password(creds.Password)},
 		HostKeyAlgorithms: []string{
 			ssh.CertAlgoRSASHA256v01,
 			ssh.CertAlgoRSAv01,
@@ -66,32 +40,66 @@ func (b *SSHBuilder) CreateCC(creds *cc.Creds) (cc.ClientConn, error) {
 			ssh.KeyAlgoED25519,
 			ssh.CertAlgoED25519v01,
 		},
-		HostKeyCallback: hostKeyCallback,
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		Timeout:         time.Second * SSH_CCONN_TIMEOUT,
 	}
-	dial, err := ssh.Dial("tcp", net.JoinHostPort(creds.IP.Addr().String(), strconv.Itoa(int(creds.IP.Port()))), &clientConfig)
-	if err != nil {
-		return nil, ErrorDialCConn
-	}
 
-	session, err := dial.NewSession()
+	client, err := ssh.Dial("tcp", net.JoinHostPort(creds.IP, creds.Port), &clientConfig)
 	if err != nil {
-		return nil, ErrorOpenNewSession
+		var opErrTarget *net.OpError
+		if errors.As(err, &opErrTarget) {
+			return nil, errors.Join(cc.ErrOperation, err)
+		}
+		return nil, errors.Join(cc.ErrUnknown, err)
 	}
 
 	return &SSH{
-		S: session,
+		C: client,
 	}, nil
 }
 
-func (s *SSH) Exec(comand string) ([]byte, error) {
-	// TODO: сделать асинхронный деплой приложения
-	output, err := s.S.Output(comand)
 
-	// fmt.Println(string(output))
+func (s *SSH) Exec(command string) ([]byte, error) {
+	session, err := s.C.NewSession()
+	if err != nil {
+		var openChannelErrTarget *ssh.OpenChannelError
+		if errors.As(err, &openChannelErrTarget) {
+			return nil, errors.Join(cc.ErrOpenChannel, err)
+		}
+		return nil, errors.Join(cc.ErrUnknown, err)
+	}
+
+	output, err := session.CombinedOutput(command)
+
+	if err != nil {
+		var exitMissingErrTarget *ssh.ExitMissingError
+		if errors.As(err, &exitMissingErrTarget) {
+			return nil, errors.Join(cc.ErrExitStatusMissing, err)
+		}
+
+		var exitErrTarget *ssh.ExitError
+		if errors.As(err, &exitErrTarget) {
+			return nil, errors.Join(cc.ErrExitStatus, err)
+		}
+
+		return nil, errors.Join(cc.ErrUnknown, err)
+	}
+  
 	return output, err
 }
 
 func (s *SSH) Close() error {
-	return s.S.Close()
+	err := s.C.Close()
+	if err != nil {
+		var opErrTarget *net.OpError
+		if errors.As(err, &opErrTarget) {
+			return errors.Join(cc.ErrOperation, err)
+		}
+		alreadyClosedErrTarget := syscall.EINVAL
+		if errors.As(err, &alreadyClosedErrTarget) {
+			return errors.Join(cc.ErrConnectionAlreadyClosed, err)
+		}
+		return errors.Join(cc.ErrUnknown, err)
+	}
+	return nil
 }

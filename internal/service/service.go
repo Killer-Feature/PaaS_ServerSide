@@ -2,17 +2,22 @@ package service
 
 import (
 	"KillerFeature/ServerSide/internal"
+	ucase "KillerFeature/ServerSide/internal"
 	cconn "KillerFeature/ServerSide/internal/client_conn"
 	"KillerFeature/ServerSide/internal/models"
-	"KillerFeature/ServerSide/pkg/taskmanager"
+	"KillerFeature/ServerSide/pkg/os_command_lib/ubuntu"
+	"bytes"
+	"errors"
+	"fmt"
 )
 
-var (
-	ErrorCreateConnWrap = "creating conn error"
+const (
+	INITIAL_LOG_LEN = 1024
 )
 
 type Service struct {
 	sshBuilder cconn.CCBuilder
+	//	TODO: add logger & log errors
 	tm         *taskmanager.Manager
 }
 
@@ -23,25 +28,11 @@ func NewService(sshBuilder cconn.CCBuilder, tm *taskmanager.Manager) internal.Us
 	}
 }
 
-func (s *Service) DeployApp(creds *models.SshCreds) error {
-	// TODO: валидация IP -- белый список
-	// TODO: task ID
+func pushToLog(log []byte, command []byte, output []byte) []byte {
+	return bytes.Join([][]byte{log, append([]byte("$ "), command...), output}, []byte("\n"))
+}
 
+func (s *Service) DeployApp(creds *models.SshCreds) (string, error) {
 	_, err := s.tm.AddTask(creds.IP+":"+creds.Port, creds.User, creds.Password)
-	if err != nil {
-		return err
-	}
-
-	//cc, err := s.sshBuilder.CreateCC(creds)
-	//if err != nil {
-	//	return errors.Wrap(err, ErrorCreateConnWrap)
-	//}
-	// TODO: GetOSCommandLib возвращает структуру с командами для конкретной ОС, вид ОС можно узнать через SSH
-	// execLib := GetOSCommandLib
-	//fmt.Println(cc.Exec("TODO"))
-
-	//
-	// TODO: Close() когда задеплоится
-	//cc.Close()
-	return nil
+	return err
 }
