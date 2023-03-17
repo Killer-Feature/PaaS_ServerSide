@@ -6,9 +6,7 @@ import (
 	"net"
 	"syscall"
 	"time"
-
 	"errors"
-
 	"golang.org/x/crypto/ssh"
 )
 
@@ -60,6 +58,7 @@ func (b *SSHBuilder) CreateCC(creds *models.SshCreds) (cc.ClientConn, error) {
 	}, nil
 }
 
+
 func (s *SSH) Exec(command string) ([]byte, error) {
 	session, err := s.C.NewSession()
 	if err != nil {
@@ -85,7 +84,7 @@ func (s *SSH) Exec(command string) ([]byte, error) {
 
 		return nil, errors.Join(cc.ErrUnknown, err)
 	}
-
+  
 	return output, err
 }
 

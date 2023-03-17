@@ -58,6 +58,7 @@ func (h *Handler) DeployApp(c echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, HttpErrorBindingParams)
 	}
+
 	// TODO: валидация
 	log, err := h.u.DeployApp(&models.SshCreds{
 		IP:       req.IP,
@@ -98,4 +99,3 @@ func (h *Handler) DeployApp(c echo.Context) error {
 	return c.JSON(http.StatusOK, models.SshDeployAppResp{Log: string(log)})
 }
 
-//TODO net neip parseip для валидации
