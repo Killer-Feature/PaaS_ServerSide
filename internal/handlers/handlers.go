@@ -2,13 +2,14 @@ package handlers
 
 import (
 	"embed"
+	"errors"
 	"io/fs"
 	"net/http"
 
 	echo "github.com/labstack/echo/v4"
 	"go.uber.org/zap"
 
-	"KillerFeature/ServerSide/internal"
+	ucase "KillerFeature/ServerSide/internal"
 	models "KillerFeature/ServerSide/internal/models"
 )
 
@@ -16,15 +17,21 @@ import (
 var ui embed.FS
 
 var (
-	HttpErrorBindingParams = "Error binding request params"
+	HttpErrorBindingParams                = "Error binding request params"
+	HttpErrDeployInstruction              = "Error executing deploy huggin application instructions. Deploy instruction exited with not 0 status"
+	HttpErrDeployInstructionMissingStatus = "Error executing deploy huggin application instructions.deploy instructions did not send exit status."
+	HttpErrUnsupportedOS                  = "Unsupported operating system installed to your server"
+	HttpErrorCreateSession                = "Your server rejects create new session request to execute deploy huggin app instructions. (A session is a remote execution of a program request)"
+	HttpErrorCreateCConn                  = "Error creating ssh connection to your server"
+	HttpErrInternal                       = "Internal server error"
 )
 
 type Handler struct {
 	logger *zap.Logger
-	u      internal.Usecase
+	u      ucase.Usecase
 }
 
-func NewHandler(logger *zap.Logger, u internal.Usecase) *Handler {
+func NewHandler(logger *zap.Logger, u ucase.Usecase) *Handler {
 	return &Handler{logger: logger, u: u}
 }
 
@@ -52,18 +59,43 @@ func (h *Handler) DeployApp(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, HttpErrorBindingParams)
 	}
 	// TODO: валидация
-	err := h.u.DeployApp(&models.SshCreds{
+	log, err := h.u.DeployApp(&models.SshCreds{
 		IP:       req.IP,
 		Port:     req.Port,
 		Password: req.Password,
 		User:     req.User,
 	})
+
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, Response{
-			StatusCode: http.StatusInternalServerError,
-			Data:       err.Error(),
-		})
+		switch {
+		case errors.Is(err, ucase.ErrExecuteDeployInstructions):
+			{
+				return c.JSON(http.StatusBadRequest, models.SshDeployAppErrorResp{Log: string(log), Error: HttpErrDeployInstruction})
+			}
+		case errors.Is(err, ucase.ErrMissingStatusDeployInstructions):
+			{
+				return c.JSON(http.StatusBadRequest, models.SshDeployAppErrorResp{Log: string(log), Error: HttpErrDeployInstructionMissingStatus})
+			}
+		case errors.Is(err, ucase.ErrorUnsupportedOS):
+			{
+				return c.JSON(http.StatusBadRequest, models.SshDeployAppErrorResp{Log: string(log), Error: HttpErrUnsupportedOS})
+			}
+		case errors.Is(err, ucase.ErrCreateSession):
+			{
+				return c.JSON(http.StatusBadRequest, models.SshDeployAppErrorResp{Log: string(log), Error: HttpErrorCreateSession})
+			}
+		case errors.Is(err, ucase.ErrCreateClientConnection):
+			{
+				return c.JSON(http.StatusBadRequest, models.SshDeployAppErrorResp{Log: string(log), Error: HttpErrorCreateCConn})
+			}
+		default:
+			{
+				return c.JSON(http.StatusInternalServerError, models.SshDeployAppErrorResp{Log: string(log), Error: HttpErrInternal})
+			}
+		}
 	}
 
-	return c.NoContent(http.StatusOK)
+	return c.JSON(http.StatusOK, models.SshDeployAppResp{Log: string(log)})
 }
+
+//TODO net neip parseip для валидации

@@ -5,6 +5,8 @@ import (
 	ucase "KillerFeature/ServerSide/internal"
 	cconn "KillerFeature/ServerSide/internal/client_conn"
 	"KillerFeature/ServerSide/internal/models"
+	"KillerFeature/ServerSide/pkg/os_command_lib/ubuntu"
+	"bytes"
 	"errors"
 	"fmt"
 )
@@ -15,6 +17,7 @@ const (
 
 type Service struct {
 	sshBuilder cconn.CCBuilder
+	//	TODO: add logger & log errors
 }
 
 func NewService(sshBuilder cconn.CCBuilder) internal.Usecase {
@@ -24,38 +27,65 @@ func NewService(sshBuilder cconn.CCBuilder) internal.Usecase {
 }
 
 func pushToLog(log []byte, command []byte, output []byte) []byte {
-	return fmt.Sprintf("%s\n$%s\n%s\n", log, command, output)
+	return bytes.Join([][]byte{log, append([]byte("$ "), command...), output}, []byte("\n"))
 }
 
-func (s *Service) DeployApp(creds *models.SshCreds) (*models.SshDeployAppServiceResp, error) {
+func (s *Service) DeployApp(creds *models.SshCreds) (string, error) {
 	cc, err := s.sshBuilder.CreateCC(creds)
 	if err != nil {
 		if errors.Is(err, cconn.ErrOperation) {
-			return nil, errors.Join(ucase.ErrCreateClientConnaction, err)
+			return "", errors.Join(ucase.ErrCreateClientConnection, err)
 		}
-		return nil, errors.Join(ucase.ErrSome, err)
+		return "", errors.Join(ucase.ErrUnknown, err)
 	}
-	defer cc.Close()
+	defer func(cc cconn.ClientConn) {
+		err := cc.Close()
+		if err != nil {
+			//	TODO: log error
+		}
+	}(cc)
 
 	// TODO: GetOSCommandLib возвращает структуру с командами для конкретной ОС, вид ОС можно узнать через SSH
 	// execLib := GetOSCommandLib("")
 
-	deployCommands, err := getDeployCommands(ubuntu2204)
-	if err != nil {
-		return nil, err
+	deployCommands := getDeployCommands(ubuntu.Ubuntu2204CommandLib{})
+	if deployCommands == nil {
+		return "", ucase.ErrorUnsupportedOS
 	}
 
-	// если произошла ошибка в процессе выполнения команды -- выдавать весь вывод
-	log := make([]byte, INITIAL_LOG_LEN)
+	log := make([]byte, 0, INITIAL_LOG_LEN)
 	for _, command := range deployCommands {
+
+		fmt.Print("=========command========")
+		fmt.Print(command)
+		fmt.Println("=========end========")
+
 		output, err := cc.Exec(command.String())
-		log = pushToLog(log)
-		fmt.Println("-------", string(command), "-------")
-		fmt.Println(string(output), err)
-		// if err != nil {
-		// return errors.Wrap(err, ErrorDeployingAppWrap)
-		// }
+		log = pushToLog(log, []byte(command), output)
+
+		fmt.Println(err)
+		fmt.Println(string(output))
+		if err != nil {
+			switch {
+			case errors.Is(err, cconn.ErrExitStatus):
+				{
+					return string(log), errors.Join(ucase.ErrExecuteDeployInstructions, err)
+				}
+			case errors.Is(err, cconn.ErrExitStatusMissing):
+				{
+					return string(log), errors.Join(ucase.ErrMissingStatusDeployInstructions, err)
+				}
+			case errors.Is(err, cconn.ErrOpenChannel):
+				{
+					return string(log), errors.Join(ucase.ErrCreateSession, err)
+				}
+			default:
+				{
+					return string(log), errors.Join(ucase.ErrUnknown, err)
+				}
+			}
+		}
 	}
 
-	return nil, nil
+	return string(log), nil
 }

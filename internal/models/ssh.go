@@ -14,6 +14,11 @@ type SshDeployAppReq struct {
 	Password string `json:"password"`
 }
 
-type SshDeployAppServiceResp struct {
-	Log string
+type SshDeployAppResp struct {
+	Log string `json:"log"`
+}
+
+type SshDeployAppErrorResp struct {
+	Log   string `json:"log"`
+	Error string `json:"error"`
 }

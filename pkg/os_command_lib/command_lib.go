@@ -1,6 +1,14 @@
 package osCommandLib
 
-import "strings"
+import (
+	"strings"
+)
+
+type Code string
+
+const (
+	ResourceAlreadyBusy Code = "16"
+)
 
 type Command string
 
@@ -23,4 +31,19 @@ func (c Command) Pipe(cmds ...Command) Command {
 		strCmds = append(strCmds, cmds[i].String())
 	}
 	return Command(strings.Join(strCmds, " | "))
+}
+
+type CommandLib interface {
+	RunBinaryCommand(path string) Command
+	NohupCommand(command Command, output string) Command
+	BackgroundCommand(command Command) Command
+	RunBinaryNohupBackground(path string, output string) Command
+	IfNotEmptyOutputThen(condition Command, statements Command) Command
+	Rmdir(path string) Command
+	Mkdir(path string) Command
+	LoadWebResource(urlPath string, dstPath string) Command
+	Chmod777(path string) Command
+	GetPIDListeningPort(port string) Command
+	ExitWithCode(code Code) Command
+	CreateFile(path string) Command
 }

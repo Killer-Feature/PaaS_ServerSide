@@ -52,7 +52,7 @@ func (b *SSHBuilder) CreateCC(creds *models.SshCreds) (cc.ClientConn, error) {
 		if errors.As(err, &opErrTarget) {
 			return nil, errors.Join(cc.ErrOperation, err)
 		}
-		return nil, errors.Join(cc.ErrSome, err)
+		return nil, errors.Join(cc.ErrUnknown, err)
 	}
 
 	return &SSH{
@@ -67,7 +67,7 @@ func (s *SSH) Exec(command string) ([]byte, error) {
 		if errors.As(err, &openChannelErrTarget) {
 			return nil, errors.Join(cc.ErrOpenChannel, err)
 		}
-		return nil, errors.Join(cc.ErrSome, err)
+		return nil, errors.Join(cc.ErrUnknown, err)
 	}
 
 	output, err := session.CombinedOutput(command)
@@ -78,12 +78,12 @@ func (s *SSH) Exec(command string) ([]byte, error) {
 			return nil, errors.Join(cc.ErrExitStatusMissing, err)
 		}
 
-		var exitErrTarget *ssh.ExitMissingError
+		var exitErrTarget *ssh.ExitError
 		if errors.As(err, &exitErrTarget) {
 			return nil, errors.Join(cc.ErrExitStatus, err)
 		}
 
-		return nil, errors.Join(cc.ErrSome, err)
+		return nil, errors.Join(cc.ErrUnknown, err)
 	}
 
 	return output, err
@@ -100,7 +100,7 @@ func (s *SSH) Close() error {
 		if errors.As(err, &alreadyClosedErrTarget) {
 			return errors.Join(cc.ErrConnectionAlreadyClosed, err)
 		}
-		return errors.Join(cc.ErrSome, err)
+		return errors.Join(cc.ErrUnknown, err)
 	}
 	return nil
 }
