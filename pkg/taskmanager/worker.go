@@ -1,12 +1,10 @@
 package taskmanager
 
 import (
+	cconn "KillerFeature/ServerSide/pkg/client_conn"
+	ssh2 "KillerFeature/ServerSide/pkg/client_conn/ssh"
 	"context"
-	"fmt"
 	"sync/atomic"
-
-	"KillerFeature/ServerSide/internal/client_conn"
-	ssh2 "KillerFeature/ServerSide/internal/client_conn/ssh"
 )
 
 type workerManager struct {
@@ -60,35 +58,30 @@ func (m *workerManager) run() {
 func (w *worker) doWork(ctx context.Context) {
 	defer w.task.callback(w.task.ID)
 
-	var cc client_conn.ClientConn
-	var err error
 	switch w.task.connectType {
 	case ssh:
 		sshBuilder := ssh2.NewSSHBuilder()
-
-		cc, err = sshBuilder.CreateCC(&client_conn.Creds{
-			IP:       w.task.IP,
-			Login:    w.task.AuthData.Login,
-			Password: w.task.AuthData.Password,
-		})
+		cc, err := sshBuilder.CreateCC(w.task.IP, w.task.AuthData.Login, w.task.AuthData.Password)
 		if err != nil {
-			w.done <- struct{}{}
-			// return errors.Wrap(err, service.ErrorCreateConnWrap)
+			//	TODO: log error & send to ws
 		}
-		defer cc.Close()
+		defer func(cc cconn.ClientConn) {
+			err := cc.Close()
+			if err != nil {
+				//	TODO: log error & send to ws
+			}
+		}(cc)
+
+		err = w.task.ProcessTask(cc)
+
+		if err != nil {
+			//	TODO: log error & send to ws
+			w.done <- struct{}{}
+		}
 	}
-
-	// TODO: GetOSCommandLib возвращает структуру с командами для конкретной ОС, вид ОС можно узнать через SSH
-
-	// TODO: Close() когда задеплоится
 
 	select {
 	case <-ctx.Done():
 	default:
 	}
-
-	data, _ := cc.Exec("ls")
-
-	fmt.Print(string(data))
-
 }

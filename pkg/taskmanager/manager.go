@@ -1,6 +1,7 @@
 package taskmanager
 
 import (
+	cconn "KillerFeature/ServerSide/pkg/client_conn"
 	"context"
 	"net/netip"
 	"sync"
@@ -48,6 +49,8 @@ type Task struct {
 	AuthData    AuthData
 	connectType ConnectType
 
+	ProcessTask func(cconn.ClientConn) error
+
 	callback func(ID ID)
 }
 
@@ -67,22 +70,15 @@ func NewTaskManager(ctx context.Context) *Manager {
 	}
 }
 
-func (m *Manager) AddTask(ip, login, password string) (ID, error) {
-	parsedIP, err := netip.ParseAddrPort(ip)
-	if err != nil {
-		return 0, err
-	}
-
+func (m *Manager) AddTask(processTask func(conn cconn.ClientConn) error, parsedIP netip.AddrPort, authData AuthData) (ID, error) {
 	id := atomic.AddUint64(&m.currentIndex, 1)
 	task := &Task{
 		IP:          parsedIP,
 		connectType: ssh,
 		ID:          ID(id),
-		AuthData: AuthData{
-			Login:    login,
-			Password: password,
-		},
-		callback: m.deleteTask,
+		AuthData:    authData,
+		ProcessTask: processTask,
+		callback:    m.deleteTask,
 	}
 
 	m.tasksByID[task.ID] = task

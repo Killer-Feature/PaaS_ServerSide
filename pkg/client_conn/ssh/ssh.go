@@ -1,13 +1,13 @@
 package ssh
 
 import (
-	cc "KillerFeature/ServerSide/internal/client_conn"
-	models "KillerFeature/ServerSide/internal/models"
-	"net"
-	"syscall"
-	"time"
+	cc "KillerFeature/ServerSide/pkg/client_conn"
 	"errors"
 	"golang.org/x/crypto/ssh"
+	"net"
+	"net/netip"
+	"syscall"
+	"time"
 )
 
 const (
@@ -25,10 +25,10 @@ func NewSSHBuilder() cc.CCBuilder {
 	return &SSHBuilder{}
 }
 
-func (b *SSHBuilder) CreateCC(creds *models.SshCreds) (cc.ClientConn, error) {
+func (b *SSHBuilder) CreateCC(addr netip.AddrPort, login, password string) (cc.ClientConn, error) {
 	clientConfig := ssh.ClientConfig{
-		User: creds.User,
-		Auth: []ssh.AuthMethod{ssh.Password(creds.Password)},
+		User: login,
+		Auth: []ssh.AuthMethod{ssh.Password(password)},
 		HostKeyAlgorithms: []string{
 			ssh.CertAlgoRSASHA256v01,
 			ssh.CertAlgoRSAv01,
@@ -44,7 +44,7 @@ func (b *SSHBuilder) CreateCC(creds *models.SshCreds) (cc.ClientConn, error) {
 		Timeout:         time.Second * SSH_CCONN_TIMEOUT,
 	}
 
-	client, err := ssh.Dial("tcp", net.JoinHostPort(creds.IP, creds.Port), &clientConfig)
+	client, err := ssh.Dial("tcp", addr.String(), &clientConfig)
 	if err != nil {
 		var opErrTarget *net.OpError
 		if errors.As(err, &opErrTarget) {
@@ -57,7 +57,6 @@ func (b *SSHBuilder) CreateCC(creds *models.SshCreds) (cc.ClientConn, error) {
 		C: client,
 	}, nil
 }
-
 
 func (s *SSH) Exec(command string) ([]byte, error) {
 	session, err := s.C.NewSession()
@@ -84,7 +83,7 @@ func (s *SSH) Exec(command string) ([]byte, error) {
 
 		return nil, errors.Join(cc.ErrUnknown, err)
 	}
-  
+
 	return output, err
 }
 

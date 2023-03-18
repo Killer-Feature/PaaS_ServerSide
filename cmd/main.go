@@ -1,6 +1,9 @@
 package main
 
 import (
+	handler "KillerFeature/ServerSide/internal/deploy_app/delivery"
+	"KillerFeature/ServerSide/internal/deploy_app/usecase"
+	"KillerFeature/ServerSide/pkg/client_conn/ssh"
 	"context"
 	"log"
 	"net/http"
@@ -12,9 +15,7 @@ import (
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/sync/errgroup"
 
-	"KillerFeature/ServerSide/internal/client_conn/ssh"
 	"KillerFeature/ServerSide/internal/handlers"
-	"KillerFeature/ServerSide/internal/service"
 	"KillerFeature/ServerSide/pkg/taskmanager"
 )
 
@@ -41,10 +42,11 @@ func main() {
 
 	tm := taskmanager.NewTaskManager(ctx)
 
-	u := service.NewService(ssh.NewSSHBuilder(), tm)
-	h := handlers.NewHandler(logger, u)
-	h.Register(server)
-
+	u := usecase.NewDeployAppUsecase(ssh.NewSSHBuilder(), tm)
+	h := handler.NewDeployAppHandler(logger, u)
+	if err := handlers.Register(server, *h); err != nil {
+		log.Fatal(err)
+	}
 	// metrics := monitoring.RegisterMonitoring(server)
 
 	//m := middleware.NewMiddleware(p.Logger, metrics)

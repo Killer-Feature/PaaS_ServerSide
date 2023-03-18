@@ -1,4 +1,4 @@
-package service
+package usecase
 
 import (
 	command_lib "KillerFeature/ServerSide/pkg/os_command_lib"
