@@ -1,22 +1,22 @@
 package main
 
 import (
-	handler "KillerFeature/ServerSide/internal/deploy_app/delivery"
-	"KillerFeature/ServerSide/internal/deploy_app/usecase"
-	"KillerFeature/ServerSide/pkg/client_conn/ssh"
 	"context"
+	"errors"
 	"log"
 	"net/http"
 
-	"errors"
+	handler "github.com/Killer-Feature/PaaS_ServerSide/internal/deploy_app/delivery"
+	"github.com/Killer-Feature/PaaS_ServerSide/internal/deploy_app/usecase"
+	"github.com/Killer-Feature/PaaS_ServerSide/pkg/client_conn/ssh"
 
 	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/sync/errgroup"
 
-	"KillerFeature/ServerSide/internal/handlers"
-	"KillerFeature/ServerSide/pkg/taskmanager"
+	"github.com/Killer-Feature/PaaS_ServerSide/internal/handlers"
+	"github.com/Killer-Feature/PaaS_ServerSide/pkg/taskmanager"
 )
 
 func main() {

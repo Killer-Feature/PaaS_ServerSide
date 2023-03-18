@@ -1,10 +1,11 @@
 package taskmanager
 
 import (
-	cconn "KillerFeature/ServerSide/pkg/client_conn"
-	ssh2 "KillerFeature/ServerSide/pkg/client_conn/ssh"
 	"context"
 	"sync/atomic"
+
+	cconn "github.com/Killer-Feature/PaaS_ServerSide/pkg/client_conn"
+	ssh2 "github.com/Killer-Feature/PaaS_ServerSide/pkg/client_conn/ssh"
 )
 
 type workerManager struct {

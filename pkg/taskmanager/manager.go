@@ -1,11 +1,12 @@
 package taskmanager
 
 import (
-	cconn "KillerFeature/ServerSide/pkg/client_conn"
 	"context"
 	"net/netip"
 	"sync"
 	"sync/atomic"
+
+	cconn "github.com/Killer-Feature/PaaS_ServerSide/pkg/client_conn"
 )
 
 type ID uint64

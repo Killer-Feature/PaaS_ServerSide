@@ -1,8 +1,9 @@
 package deploy_app
 
 import (
-	"KillerFeature/ServerSide/internal/models"
 	"errors"
+
+	"github.com/Killer-Feature/PaaS_ServerSide/internal/models"
 )
 
 type DeployAppUsecase interface {
