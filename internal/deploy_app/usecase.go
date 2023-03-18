@@ -7,7 +7,7 @@ import (
 )
 
 type DeployAppUsecase interface {
-	DeployApp(creds *models.SshCreds) error
+	DeployApp(creds *models.SshCreds) (uint64, error)
 }
 
 var (

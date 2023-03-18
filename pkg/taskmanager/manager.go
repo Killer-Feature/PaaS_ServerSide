@@ -2,11 +2,16 @@ package taskmanager
 
 import (
 	"context"
+	cconn "github.com/Killer-Feature/PaaS_ServerSide/pkg/client_conn"
+	servlog "github.com/Killer-Feature/PaaS_ServerSide/pkg/logger"
 	"net/netip"
 	"sync"
 	"sync/atomic"
+)
 
-	cconn "github.com/Killer-Feature/PaaS_ServerSide/pkg/client_conn"
+var (
+	errDeleteTask = "error deleting task by id from task manager"
+	errFindTask   = "error finding task by id from task manager"
 )
 
 type ID uint64
@@ -14,6 +19,8 @@ type ID uint64
 type Manager struct {
 	tasksByID map[ID]*Task
 	tasksByIP map[netip.AddrPort]*Task
+
+	logger *servlog.ServLogger
 
 	// TODO: Change on chan with backlog
 	workerChan    chan *Task
@@ -25,12 +32,12 @@ type Manager struct {
 func (m *Manager) deleteTask(ID ID) {
 	task, ok := m.tasksByID[ID]
 	if !ok {
-		//TODO: Add logging
+		m.logger.TaskError(uint64(ID), errFindTask)
 	}
 	delete(m.tasksByID, ID)
 	_, ok = m.tasksByIP[task.IP]
 	if !ok {
-		//TODO: Add logging
+		m.logger.TaskError(uint64(ID), errDeleteTask)
 	}
 	delete(m.tasksByIP, task.IP)
 }
@@ -60,14 +67,15 @@ type AuthData struct {
 	Password string
 }
 
-func NewTaskManager(ctx context.Context) *Manager {
+func NewTaskManager(ctx context.Context, logger *servlog.ServLogger) *Manager {
 	taskChan := make(chan *Task)
 	return &Manager{
 		tasksByID:     map[ID]*Task{},
 		tasksByIP:     map[netip.AddrPort]*Task{},
 		workerChan:    taskChan,
-		workerManager: newWorkerManager(ctx, taskChan),
+		workerManager: newWorkerManager(ctx, taskChan, logger),
 		currentIndex:  0,
+		logger:        logger,
 	}
 }
 

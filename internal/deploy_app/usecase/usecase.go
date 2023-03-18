@@ -13,8 +13,7 @@ import (
 
 type DeployAppUsecase struct {
 	sshBuilder cconn.CCBuilder
-	//	TODO: add logger & log errors
-	tm *taskmanager.Manager
+	tm         *taskmanager.Manager
 }
 
 func NewDeployAppUsecase(sshBuilder cconn.CCBuilder, tm *taskmanager.Manager) ucase.DeployAppUsecase {
@@ -24,12 +23,12 @@ func NewDeployAppUsecase(sshBuilder cconn.CCBuilder, tm *taskmanager.Manager) uc
 	}
 }
 
-func (s *DeployAppUsecase) DeployApp(creds *models.SshCreds) error {
-	_, err := s.tm.AddTask(DeployAppProcessTask, creds.Addr, taskmanager.AuthData{Login: creds.Login, Password: creds.Password})
+func (u *DeployAppUsecase) DeployApp(creds *models.SshCreds) (uint64, error) {
+	taskId, err := u.tm.AddTask(DeployAppProcessTask, creds.Addr, taskmanager.AuthData{Login: creds.Login, Password: creds.Password})
 	if err != nil {
-		return errors.Join(ucase.ErrAddingToTaskManager, err)
+		return uint64(taskId), errors.Join(ucase.ErrAddingToTaskManager, err)
 	}
-	return nil
+	return uint64(taskId), nil
 }
 
 func DeployAppProcessTask(cc cconn.ClientConn) error {

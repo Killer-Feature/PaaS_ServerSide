@@ -1,14 +1,13 @@
 package handler
 
 import (
+	ucase "github.com/Killer-Feature/PaaS_ServerSide/internal/deploy_app"
+	"github.com/Killer-Feature/PaaS_ServerSide/internal/handlers/middleware"
+	"github.com/Killer-Feature/PaaS_ServerSide/internal/models"
+	servlog "github.com/Killer-Feature/PaaS_ServerSide/pkg/logger"
+	"github.com/labstack/echo/v4"
 	"net/http"
 	"net/netip"
-
-	"github.com/labstack/echo/v4"
-	"go.uber.org/zap"
-
-	ucase "github.com/Killer-Feature/PaaS_ServerSide/internal/deploy_app"
-	"github.com/Killer-Feature/PaaS_ServerSide/internal/models"
 )
 
 var (
@@ -19,16 +18,21 @@ var (
 	HttpErrInternal        = "Internal server error."
 )
 
+var (
+	errAddDeployTaskToTaskManager = "error adding deploy-task to task manager"
+)
+
 type DeployAppHandler struct {
-	logger *zap.Logger
+	logger *servlog.ServLogger
 	u      ucase.DeployAppUsecase
 }
 
-func NewDeployAppHandler(logger *zap.Logger, u ucase.DeployAppUsecase) *DeployAppHandler {
+func NewDeployAppHandler(logger *servlog.ServLogger, u ucase.DeployAppUsecase) *DeployAppHandler {
 	return &DeployAppHandler{logger: logger, u: u}
 }
 
 func (h *DeployAppHandler) DeployApp(c echo.Context) error {
+	reqId := middleware.GetRequestIdFromCtx(c)
 	var req models.SshDeployAppReq
 	if err := c.Bind(&req); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, HttpErrorBindingParams)
@@ -47,13 +51,15 @@ func (h *DeployAppHandler) DeployApp(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, HttpErrorValidateAddr)
 	}
 
-	err = h.u.DeployApp(&models.SshCreds{
+	// TODO: set deploy-task-id cookie
+	_, err = h.u.DeployApp(&models.SshCreds{
 		Addr:     ipPort,
 		Password: req.Password,
 		Login:    req.Login,
 	})
 
 	if err != nil {
+		h.logger.RequestError(reqId, errAddDeployTaskToTaskManager+": "+err.Error())
 		return echo.NewHTTPError(http.StatusInternalServerError, HttpErrInternal)
 	}
 
