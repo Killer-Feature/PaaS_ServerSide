@@ -2,9 +2,7 @@ package taskmanager
 
 import (
 	"context"
-	cconn "github.com/Killer-Feature/PaaS_ServerSide/pkg/client_conn"
 	servlog "github.com/Killer-Feature/PaaS_ServerSide/pkg/logger"
-	"net/netip"
 	"sync"
 	"sync/atomic"
 )
@@ -16,50 +14,40 @@ var (
 
 type ID uint64
 
-type Manager struct {
-	tasksByID map[ID]*Task
-	tasksByIP map[netip.AddrPort]*Task
+type Manager[TKey comparable] struct {
+	tasksByID  map[ID]*Task[TKey]
+	tasksByKey map[TKey]*Task[TKey]
 
 	logger *servlog.ServLogger
 
 	// TODO: Change on chan with backlog
-	workerChan    chan *Task
-	workerManager *workerManager
+	workerChan    chan *Task[TKey]
+	workerManager *workerManager[TKey]
 
 	currentIndex uint64
 }
 
-func (m *Manager) deleteTask(ID ID) {
+func (m *Manager[_]) deleteTask(ID ID) {
 	task, ok := m.tasksByID[ID]
 	if !ok {
 		m.logger.TaskError(uint64(ID), errFindTask)
 	}
 	delete(m.tasksByID, ID)
-	_, ok = m.tasksByIP[task.IP]
+	_, ok = m.tasksByKey[task.Key]
 	if !ok {
 		m.logger.TaskError(uint64(ID), errDeleteTask)
 	}
-	delete(m.tasksByIP, task.IP)
+	delete(m.tasksByKey, task.Key)
 }
 
 type ConnectType int
 
-const (
-	ssh ConnectType = iota
-	winrm
-)
-
-type Task struct {
-	mu sync.RWMutex
-
-	IP          netip.AddrPort
+type Task[TKey comparable] struct {
+	mu          sync.RWMutex
+	Key         TKey
 	ID          ID
-	AuthData    AuthData
-	connectType ConnectType
-
-	ProcessTask func(cconn.ClientConn) error
-
-	callback func(ID ID)
+	ProcessTask func(taskID ID) error
+	callback    func(ID ID)
 }
 
 type AuthData struct {
@@ -67,11 +55,11 @@ type AuthData struct {
 	Password string
 }
 
-func NewTaskManager(ctx context.Context, logger *servlog.ServLogger) *Manager {
-	taskChan := make(chan *Task)
-	return &Manager{
-		tasksByID:     map[ID]*Task{},
-		tasksByIP:     map[netip.AddrPort]*Task{},
+func NewTaskManager[TKey comparable](ctx context.Context, logger *servlog.ServLogger) *Manager[TKey] {
+	taskChan := make(chan *Task[TKey])
+	return &Manager[TKey]{
+		tasksByID:     map[ID]*Task[TKey]{},
+		tasksByKey:    map[TKey]*Task[TKey]{},
 		workerChan:    taskChan,
 		workerManager: newWorkerManager(ctx, taskChan, logger),
 		currentIndex:  0,
@@ -79,19 +67,17 @@ func NewTaskManager(ctx context.Context, logger *servlog.ServLogger) *Manager {
 	}
 }
 
-func (m *Manager) AddTask(processTask func(conn cconn.ClientConn) error, parsedIP netip.AddrPort, authData AuthData) (ID, error) {
+func (m *Manager[TKey]) AddTask(processTask func(taskId ID) error, key TKey) (ID, error) {
 	id := atomic.AddUint64(&m.currentIndex, 1)
-	task := &Task{
-		IP:          parsedIP,
-		connectType: ssh,
+	task := &Task[TKey]{
+		Key:         key,
 		ID:          ID(id),
-		AuthData:    authData,
 		ProcessTask: processTask,
 		callback:    m.deleteTask,
 	}
 
 	m.tasksByID[task.ID] = task
-	m.tasksByIP[parsedIP] = task
+	m.tasksByKey[key] = task
 
 	go func() {
 		m.workerChan <- task

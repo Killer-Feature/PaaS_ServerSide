@@ -51,7 +51,7 @@ func (h *DeployAppHandler) DeployApp(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, HttpErrorValidateAddr)
 	}
 
-	// TODO: set deploy-task-id cookie
+	//TODO: set deploy-task-id cookie
 	_, err = h.u.DeployApp(&models.SshCreds{
 		Addr:     ipPort,
 		Password: req.Password,

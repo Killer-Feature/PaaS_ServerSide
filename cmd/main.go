@@ -18,6 +18,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"log"
 	"net/http"
+	"net/netip"
 )
 
 func main() {
@@ -61,7 +62,7 @@ func main() {
 	ctx := context.Background()
 	g, _ := errgroup.WithContext(ctx)
 
-	tm := taskmanager.NewTaskManager(ctx, servLogger)
+	tm := taskmanager.NewTaskManager[netip.AddrPort](ctx, servLogger)
 
 	u := usecase.NewDeployAppUsecase(ssh.NewSSHBuilder(), tm)
 	h := handler.NewDeployAppHandler(servLogger, u)

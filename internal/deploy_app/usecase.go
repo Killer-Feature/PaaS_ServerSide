@@ -17,4 +17,6 @@ var (
 	ErrCreateSession                   = errors.New("target server rejects create new session request")
 	ErrMissingStatusDeployInstructions = errors.New("deploy instructions did not send exit status")
 	ErrExecuteDeployInstructions       = errors.New("deploy instruction exited with not 0 status")
+	ErrCreateCC                        = errors.New("error creating new ssh connection")
+	ErrCloseCC                         = errors.New("error closing ssh connection")
 )
