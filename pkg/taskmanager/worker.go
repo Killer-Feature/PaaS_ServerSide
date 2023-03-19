@@ -2,37 +2,33 @@ package taskmanager
 
 import (
 	"context"
-	cconn "github.com/Killer-Feature/PaaS_ServerSide/pkg/client_conn"
-	ssh2 "github.com/Killer-Feature/PaaS_ServerSide/pkg/client_conn/ssh"
 	servlog "github.com/Killer-Feature/PaaS_ServerSide/pkg/logger"
 	"sync/atomic"
 )
 
 var (
-	errCreateCC    = "error creating client connection"
-	errCloseCC     = "error closing client connection"
 	errProcessTask = "error processing task"
 )
 
-type workerManager struct {
+type workerManager[TKey comparable] struct {
 	ctx          context.Context
-	taskChan     chan *Task
-	workers      map[ID]*worker
+	taskChan     chan *Task[TKey]
+	workers      map[ID]*worker[TKey]
 	workersCount uint32
 	logger       *servlog.ServLogger
 }
 
-type worker struct {
-	task   *Task
+type worker[TKey comparable] struct {
+	task   *Task[TKey]
 	done   chan struct{}
 	logger *servlog.ServLogger
 }
 
-func newWorkerManager(ctx context.Context, taskChan chan *Task, logger *servlog.ServLogger) *workerManager {
-	m := &workerManager{
+func newWorkerManager[TKey comparable](ctx context.Context, taskChan chan *Task[TKey], logger *servlog.ServLogger) *workerManager[TKey] {
+	m := &workerManager[TKey]{
 		ctx:          ctx,
 		taskChan:     taskChan,
-		workers:      map[ID]*worker{},
+		workers:      map[ID]*worker[TKey]{},
 		workersCount: 0,
 		logger:       logger,
 	}
@@ -40,9 +36,9 @@ func newWorkerManager(ctx context.Context, taskChan chan *Task, logger *servlog.
 	return m
 }
 
-func (m *workerManager) createWorker(task *Task, logger *servlog.ServLogger) chan struct{} {
+func (m *workerManager[TKey]) createWorker(task *Task[TKey], logger *servlog.ServLogger) chan struct{} {
 	doneCh := make(chan struct{})
-	newWorker := &worker{
+	newWorker := &worker[TKey]{
 		task:   task,
 		done:   doneCh,
 		logger: logger,
@@ -52,7 +48,7 @@ func (m *workerManager) createWorker(task *Task, logger *servlog.ServLogger) cha
 	return doneCh
 }
 
-func (m *workerManager) run() {
+func (m *workerManager[TKey]) run() {
 	for {
 		select {
 		case <-m.ctx.Done():
@@ -64,29 +60,12 @@ func (m *workerManager) run() {
 	}
 }
 
-func (w *worker) doWork(ctx context.Context) {
+func (w *worker[TKey]) doWork(ctx context.Context) {
 	defer w.task.callback(w.task.ID)
-
-	switch w.task.connectType {
-	case ssh:
-		sshBuilder := ssh2.NewSSHBuilder()
-		cc, err := sshBuilder.CreateCC(w.task.IP, w.task.AuthData.Login, w.task.AuthData.Password)
-		if err != nil {
-			w.logger.TaskError(uint64(w.task.ID), errCreateCC+": "+err.Error())
-		}
-		defer func(cc cconn.ClientConn) {
-			err := cc.Close()
-			if err != nil {
-				w.logger.TaskError(uint64(w.task.ID), errCloseCC+": "+err.Error())
-			}
-		}(cc)
-
-		err = w.task.ProcessTask(cc)
-
-		if err != nil {
-			w.logger.TaskError(uint64(w.task.ID), errProcessTask+": "+err.Error())
-			w.done <- struct{}{}
-		}
+	err := w.task.ProcessTask(w.task.ID)
+	if err != nil {
+		w.logger.TaskError(uint64(w.task.ID), errProcessTask+": "+err.Error())
+		w.done <- struct{}{}
 	}
 
 	select {
