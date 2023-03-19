@@ -12,6 +12,7 @@ import (
 	"github.com/Killer-Feature/PaaS_ServerSide/pkg/logger/zaplogger"
 	"github.com/Killer-Feature/PaaS_ServerSide/pkg/taskmanager"
 	"github.com/labstack/echo/v4"
+	echomiddleware "github.com/labstack/echo/v4/middleware"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/sync/errgroup"
@@ -20,7 +21,6 @@ import (
 )
 
 func main() {
-	//config := zap.NewDevelopmentConfig()
 	config := zap.Config{
 		Level:            zap.NewAtomicLevelAt(zap.InfoLevel),
 		Development:      true,
@@ -67,7 +67,16 @@ func main() {
 	h := handler.NewDeployAppHandler(servLogger, u)
 
 	middlewares := middleware.NewCommonMiddleware(servLogger)
-	if err := handlers.Register(server, *h, middlewares); err != nil {
+	mwChain := []echo.MiddlewareFunc{
+		middlewares.PanicMiddleware,
+		middlewares.RequestIdMiddleware,
+		middlewares.AccessLogMiddleware,
+		middlewares.PanicMiddleware,
+		echomiddleware.CORSWithConfig(middleware.GetCorsConfig([]string{"", "http://localhost:3000"}, 86400)),
+	}
+	server.Use(mwChain...)
+
+	if err := handlers.Register(server, *h); err != nil {
 		log.Fatal(err)
 	}
 	// metrics := monitoring.RegisterMonitoring(server)

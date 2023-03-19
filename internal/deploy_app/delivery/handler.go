@@ -11,11 +11,11 @@ import (
 )
 
 var (
-	HttpErrorBindingParams = "Error binding request params."
-	HttpErrorValidateIP    = "Your ip address is invalid. Please provide global IPv4 address."
-	HttpErrorValidatePort  = "Your port is invalid. Please provide non-zero port."
-	HttpErrorValidateAddr  = "Your address is invalid. Please provide global IPv4 address and non-zero port."
-	HttpErrInternal        = "Internal server error."
+	HttpErrorBindingParams = "Переданы невалидные данные."
+	HttpErrorValidateIP    = "Передан невалидный IP-адрес. Пожалуйста, укажите глобальный IPv4 адрес."
+	HttpErrorValidatePort  = "Передан невалидный порт. Пожалуйста, укажите ненулевой порт."
+	HttpErrorValidateAddr  = "Передан невалидный IP-адрес или порт. Пожалуйста, укажите глобальный IPv4 адрес и ненулевой порт."
+	HttpErrInternal        = "Внутренняя ошибка сервера."
 )
 
 var (
