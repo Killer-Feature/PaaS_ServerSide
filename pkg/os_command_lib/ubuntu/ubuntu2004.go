@@ -1,8 +1,9 @@
 package ubuntu
 
 import (
-	cl "KillerFeature/ServerSide/pkg/os_command_lib"
 	"fmt"
+
+	cl "github.com/Killer-Feature/PaaS_ServerSide/pkg/os_command_lib"
 )
 
 type Ubuntu2004CommandLib struct{}

@@ -1,16 +1,17 @@
-package internal
+package deploy_app
 
 import (
-	"KillerFeature/ServerSide/internal/models"
 	"errors"
+
+	"github.com/Killer-Feature/PaaS_ServerSide/internal/models"
 )
 
-type Usecase interface {
-	DeployApp(creds *models.SshCreds) (string, error)
+type DeployAppUsecase interface {
+	DeployApp(creds *models.SshCreds) (uint64, error)
 }
 
 var (
-	ErrCreateClientConnection          = errors.New("error creating client connection")
+	ErrAddingToTaskManager             = errors.New("error adding deploy-task to task manager")
 	ErrorUnsupportedOS                 = errors.New("unsupported operating system")
 	ErrUnknown                         = errors.New("")
 	ErrCreateSession                   = errors.New("target server rejects create new session request")

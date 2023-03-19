@@ -1,12 +1,12 @@
 package client_conn
 
 import (
-	"KillerFeature/ServerSide/internal/models"
 	"errors"
+	"net/netip"
 )
 
 type CCBuilder interface {
-	CreateCC(creds *models.SshCreds) (ClientConn, error)
+	CreateCC(ip netip.AddrPort, login, password string) (ClientConn, error)
 }
 
 type ClientConn interface {

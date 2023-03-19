@@ -1,8 +1,9 @@
 package ubuntu
 
 import (
-	cl "KillerFeature/ServerSide/pkg/os_command_lib"
 	"fmt"
+
+	cl "github.com/Killer-Feature/PaaS_ServerSide/pkg/os_command_lib"
 )
 
 type Ubuntu2204CommandLib struct{}
@@ -40,7 +41,7 @@ func (_ Ubuntu2204CommandLib) LoadWebResource(urlPath string, dstPath string) cl
 }
 
 func (_ Ubuntu2204CommandLib) Chmod777(path string) cl.Command {
-	return cl.Command(fmt.Sprintf("chmod 777 %s", path))
+	return cl.Command("chmod 777 " + path)
 }
 
 func (_ Ubuntu2204CommandLib) GetPIDListeningPort(port string) cl.Command {

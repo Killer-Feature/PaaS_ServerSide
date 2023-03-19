@@ -2,49 +2,83 @@ package main
 
 import (
 	"context"
-	"log"
-	"net/http"
-
 	"errors"
-
+	handler "github.com/Killer-Feature/PaaS_ServerSide/internal/deploy_app/delivery"
+	"github.com/Killer-Feature/PaaS_ServerSide/internal/deploy_app/usecase"
+	"github.com/Killer-Feature/PaaS_ServerSide/internal/handlers"
+	"github.com/Killer-Feature/PaaS_ServerSide/internal/handlers/middleware"
+	"github.com/Killer-Feature/PaaS_ServerSide/pkg/client_conn/ssh"
+	servlog "github.com/Killer-Feature/PaaS_ServerSide/pkg/logger"
+	"github.com/Killer-Feature/PaaS_ServerSide/pkg/logger/zaplogger"
+	"github.com/Killer-Feature/PaaS_ServerSide/pkg/taskmanager"
 	"github.com/labstack/echo/v4"
+	echomiddleware "github.com/labstack/echo/v4/middleware"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/sync/errgroup"
-
-	"KillerFeature/ServerSide/internal/client_conn/ssh"
-	"KillerFeature/ServerSide/internal/handlers"
-	"KillerFeature/ServerSide/internal/service"
-	"KillerFeature/ServerSide/pkg/taskmanager"
+	"log"
+	"net/http"
 )
 
 func main() {
+	config := zap.Config{
+		Level:            zap.NewAtomicLevelAt(zap.InfoLevel),
+		Development:      true,
+		Encoding:         "json",
+		OutputPaths:      []string{"log"},
+		ErrorOutputPaths: []string{"stderr"},
 
-	config := zap.NewDevelopmentConfig()
-	config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
-	prLogger, err := config.Build()
-	if err != nil {
-		log.Fatal("zap logger build error")
+		EncoderConfig: zapcore.EncoderConfig{
+			TimeKey:        "ts",
+			LevelKey:       "level",
+			NameKey:        "logger",
+			CallerKey:      "caller",
+			FunctionKey:    zapcore.OmitKey,
+			MessageKey:     "msg",
+			StacktraceKey:  "stacktrace",
+			LineEnding:     zapcore.DefaultLineEnding,
+			EncodeLevel:    zapcore.LowercaseLevelEncoder,
+			EncodeTime:     zapcore.EpochTimeEncoder,
+			EncodeDuration: zapcore.SecondsDurationEncoder,
+			EncodeCaller:   zapcore.ShortCallerEncoder,
+		},
 	}
-	logger := prLogger
-	defer func(prLogger *zap.Logger) {
-		err = prLogger.Sync()
+	logger, err := zaplogger.NewZapLogger(&config)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	defer func() {
+		err := logger.Sync()
 		if err != nil {
-			log.Fatal(err)
+			log.Fatal("Error occurred in logger sync")
 		}
-	}(prLogger)
+	}()
+
+	servLogger := servlog.NewServLogger(logger)
 
 	server := echo.New()
 
 	ctx := context.Background()
 	g, _ := errgroup.WithContext(ctx)
 
-	tm := taskmanager.NewTaskManager(ctx)
+	tm := taskmanager.NewTaskManager(ctx, servLogger)
 
-	u := service.NewService(ssh.NewSSHBuilder(), tm)
-	h := handlers.NewHandler(logger, u)
-	h.Register(server)
+	u := usecase.NewDeployAppUsecase(ssh.NewSSHBuilder(), tm)
+	h := handler.NewDeployAppHandler(servLogger, u)
 
+	middlewares := middleware.NewCommonMiddleware(servLogger)
+	mwChain := []echo.MiddlewareFunc{
+		middlewares.PanicMiddleware,
+		middlewares.RequestIdMiddleware,
+		middlewares.AccessLogMiddleware,
+		middlewares.PanicMiddleware,
+		echomiddleware.CORSWithConfig(middleware.GetCorsConfig([]string{"", "http://localhost:3000"}, 86400)),
+	}
+	server.Use(mwChain...)
+
+	if err := handlers.Register(server, *h); err != nil {
+		log.Fatal(err)
+	}
 	// metrics := monitoring.RegisterMonitoring(server)
 
 	//m := middleware.NewMiddleware(p.Logger, metrics)

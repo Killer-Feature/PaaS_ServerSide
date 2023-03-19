@@ -1,9 +1,10 @@
-package service
+package usecase
 
 import (
-	command_lib "KillerFeature/ServerSide/pkg/os_command_lib"
-	ubuntu "KillerFeature/ServerSide/pkg/os_command_lib/ubuntu"
 	"path/filepath"
+
+	command_lib "github.com/Killer-Feature/PaaS_ServerSide/pkg/os_command_lib"
+	ubuntu "github.com/Killer-Feature/PaaS_ServerSide/pkg/os_command_lib/ubuntu"
 )
 
 const (
