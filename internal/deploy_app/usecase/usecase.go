@@ -5,12 +5,12 @@ import (
 	"fmt"
 	ssh2 "github.com/Killer-Feature/PaaS_ServerSide/pkg/client_conn/ssh"
 	servlog "github.com/Killer-Feature/PaaS_ServerSide/pkg/logger"
+	cl2 "github.com/Killer-Feature/PaaS_ServerSide/pkg/os_command_lib"
 	"net/netip"
 
 	ucase "github.com/Killer-Feature/PaaS_ServerSide/internal/deploy_app"
 	"github.com/Killer-Feature/PaaS_ServerSide/internal/models"
 	cconn "github.com/Killer-Feature/PaaS_ServerSide/pkg/client_conn"
-	"github.com/Killer-Feature/PaaS_ServerSide/pkg/os_command_lib/ubuntu"
 	"github.com/Killer-Feature/PaaS_ServerSide/pkg/taskmanager"
 )
 
@@ -50,7 +50,12 @@ func (u *DeployAppUsecase) DeployAppProcessTask(creds *models.SshCreds) func(tas
 			}
 		}(cc)
 
-		deployCommands := getDeployCommands(ubuntu.Ubuntu2204CommandLib{})
+		osRelease, err := getOSRelease(cc)
+		if err != nil {
+			return errors.Join(ucase.ErrorUnsupportedOS, err)
+		}
+
+		deployCommands := getDeployCommands(osRelease)
 		if deployCommands == nil {
 			return ucase.ErrorUnsupportedOS
 		}
@@ -90,4 +95,33 @@ func (u *DeployAppUsecase) DeployAppProcessTask(creds *models.SshCreds) func(tas
 
 		return nil
 	}
+}
+
+func getOSRelease(cc cconn.ClientConn) (cl2.OSRelease, error) {
+	osReleaseCommand := cl2.GetOSRelease()
+	output, err := cc.Exec(string(osReleaseCommand.Command))
+
+	if err != nil {
+		switch {
+		case errors.Is(err, cconn.ErrExitStatus):
+			{
+				return cl2.UnknownOS, errors.Join(ucase.ErrExecuteDeployInstructions, err)
+			}
+		case errors.Is(err, cconn.ErrExitStatusMissing):
+			{
+				return cl2.UnknownOS, errors.Join(ucase.ErrMissingStatusDeployInstructions, err)
+			}
+		case errors.Is(err, cconn.ErrOpenChannel):
+			{
+				return cl2.UnknownOS, errors.Join(ucase.ErrCreateSession, err)
+			}
+		default:
+			{
+				return cl2.UnknownOS, errors.Join(ucase.ErrUnknown, err)
+			}
+		}
+	}
+	osRelease := cl2.UnknownOS
+	_ = osReleaseCommand.Parser(output, &osRelease)
+	return osRelease, nil
 }

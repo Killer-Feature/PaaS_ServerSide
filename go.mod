@@ -9,7 +9,9 @@ require (
 	golang.org/x/sync v0.1.0
 )
 
+
 require (
+	github.com/Killer-Feature/PaaS_ClientSide v0.0.2-0.20230319190054-7bfcb3348834 // indirect
 	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/labstack/gommon v0.4.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
