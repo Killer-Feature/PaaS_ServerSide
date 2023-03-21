@@ -1,0 +1,76 @@
+package os_command_lib
+
+import (
+	"fmt"
+	cl "github.com/Killer-Feature/PaaS_ClientSide/pkg/os_command_lib"
+)
+
+const (
+	ResourceAlreadyBusy uint16 = 16
+)
+
+type Ubuntu2004CommandLib struct{}
+
+func (_ Ubuntu2004CommandLib) RunBinaryCommand(path string) cl.CommandAndParser {
+	return cl.CommandAndParser{
+		Command:   cl.Command("./" + path),
+		Parser:    nil,
+		Condition: cl.Required,
+	}
+}
+
+func (u Ubuntu2004CommandLib) RunBinaryNohupBackground(path string, output string) cl.CommandAndParser {
+	return cl.CommandAndParser{
+		Command:   cl.Command(fmt.Sprintf("nohup ./%s > %s 2>&1 &", path, output)),
+		Parser:    nil,
+		Condition: cl.Required,
+	}
+}
+
+func (_ Ubuntu2004CommandLib) Rmdir(path string) cl.CommandAndParser {
+	return cl.CommandAndParser{
+		Command:   cl.Command("rm -rf " + path),
+		Parser:    nil,
+		Condition: cl.Required,
+	}
+}
+
+func (_ Ubuntu2004CommandLib) Mkdir(path string) cl.CommandAndParser {
+	return cl.CommandAndParser{
+		Command:   cl.Command("mkdir " + path),
+		Parser:    nil,
+		Condition: cl.Required,
+	}
+}
+
+func (_ Ubuntu2004CommandLib) LoadWebResource(urlPath string, dstPath string) cl.CommandAndParser {
+	return cl.CommandAndParser{
+		Command:   cl.Command(fmt.Sprintf("wget -O %s %s", dstPath, urlPath)),
+		Parser:    nil,
+		Condition: cl.Required,
+	}
+}
+
+func (_ Ubuntu2004CommandLib) Chmod777(path string) cl.CommandAndParser {
+	return cl.CommandAndParser{
+		Command:   cl.Command(fmt.Sprintf("chmod 777 %s", path)),
+		Parser:    nil,
+		Condition: cl.Required,
+	}
+}
+
+func (_ Ubuntu2004CommandLib) AssertHasProcessListeningPort(port uint16) cl.CommandAndParser {
+	return cl.CommandAndParser{
+		Command:   cl.Command(fmt.Sprintf("if [[ $(lsof -i:%d) ]]; then  exit %d; fi", port, ResourceAlreadyBusy)),
+		Parser:    nil,
+		Condition: cl.Required,
+	}
+}
+
+func (_ Ubuntu2004CommandLib) CreateFile(path string) cl.CommandAndParser {
+	return cl.CommandAndParser{
+		Command:   cl.Command("touch " + path),
+		Parser:    nil,
+		Condition: cl.Required,
+	}
+}

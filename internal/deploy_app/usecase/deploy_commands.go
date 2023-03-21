@@ -1,17 +1,16 @@
 package usecase
 
 import (
+	cl "github.com/Killer-Feature/PaaS_ClientSide/pkg/os_command_lib"
+	cl2 "github.com/Killer-Feature/PaaS_ServerSide/pkg/os_command_lib"
 	"path/filepath"
-
-	command_lib "github.com/Killer-Feature/PaaS_ServerSide/pkg/os_command_lib"
-	ubuntu "github.com/Killer-Feature/PaaS_ServerSide/pkg/os_command_lib/ubuntu"
 )
 
 const (
-	HUGGIN_LISTENING_PORT = "8090"
-	HUGGIN_DIR            = "huggin"
-	HUGGIN_BINARY_NAME    = "HUGGIN"
-	NOHUP_OUTPUT_NAME     = "nohup_output"
+	HUGGIN_LISTENING_PORT uint16 = 8090
+	HUGGIN_DIR                   = "huggin"
+	HUGGIN_BINARY_NAME           = "HUGGIN"
+	NOHUP_OUTPUT_NAME            = "nohup_output"
 )
 
 const (
@@ -19,32 +18,35 @@ const (
 	HUGGIN_BINARY_URL_U2004 = "https://github.com/Killer-Feature/PaaS_ClientSide/releases/download/v0.0.1/PaaS_20.04"
 )
 
-func getDeployCommands(commandBook command_lib.CommandLib) []command_lib.Command {
+func getDeployCommands(release cl2.OSRelease) []cl.CommandAndParser {
 	binaryPath := filepath.Join(HUGGIN_DIR, HUGGIN_BINARY_NAME)
-	nohupOutputPath := filepath.Join(HUGGIN_DIR, NOHUP_OUTPUT_NAME)
-	switch commandBook.(type) {
-	case ubuntu.Ubuntu2204CommandLib:
+	outputPath := filepath.Join(HUGGIN_DIR, NOHUP_OUTPUT_NAME)
+	switch release {
+	case cl2.Ubuntu2204:
 		{
-			return []command_lib.Command{
-				commandBook.IfNotEmptyOutputThen(commandBook.GetPIDListeningPort(HUGGIN_LISTENING_PORT), commandBook.ExitWithCode(command_lib.ResourceAlreadyBusy)),
-				commandBook.Rmdir(HUGGIN_DIR),
-				commandBook.Mkdir(HUGGIN_DIR),
-				commandBook.LoadWebResource(HUGGIN_BINARY_URL_U2204, binaryPath),
-				commandBook.Chmod777(binaryPath),
-				commandBook.CreateFile(nohupOutputPath),
-				commandBook.RunBinaryNohupBackground(binaryPath, nohupOutputPath),
+			os := cl2.Ubuntu2204CommandLib{}
+			return []cl.CommandAndParser{
+				os.AssertHasProcessListeningPort(HUGGIN_LISTENING_PORT),
+				os.Rmdir(HUGGIN_DIR),
+				os.Mkdir(HUGGIN_DIR),
+				os.LoadWebResource(HUGGIN_BINARY_URL_U2204, binaryPath),
+				os.Chmod777(binaryPath),
+				os.CreateFile(outputPath),
+				os.RunBinaryNohupBackground(binaryPath, outputPath),
 			}
 		}
-	case ubuntu.Ubuntu2004CommandLib:
+
+	case cl2.Ubuntu2004:
 		{
-			return []command_lib.Command{
-				commandBook.IfNotEmptyOutputThen(commandBook.GetPIDListeningPort(HUGGIN_LISTENING_PORT), commandBook.ExitWithCode(command_lib.ResourceAlreadyBusy)),
-				commandBook.Rmdir(HUGGIN_DIR),
-				commandBook.Mkdir(HUGGIN_DIR),
-				commandBook.LoadWebResource(HUGGIN_BINARY_URL_U2004, binaryPath),
-				commandBook.Chmod777(binaryPath),
-				commandBook.CreateFile(nohupOutputPath),
-				commandBook.RunBinaryNohupBackground(binaryPath, nohupOutputPath),
+			os := cl2.Ubuntu2004CommandLib{}
+			return []cl.CommandAndParser{
+				os.AssertHasProcessListeningPort(HUGGIN_LISTENING_PORT),
+				os.Rmdir(HUGGIN_DIR),
+				os.Mkdir(HUGGIN_DIR),
+				os.LoadWebResource(HUGGIN_BINARY_URL_U2004, binaryPath),
+				os.Chmod777(binaryPath),
+				os.CreateFile(outputPath),
+				os.RunBinaryNohupBackground(binaryPath, outputPath),
 			}
 		}
 	default:
