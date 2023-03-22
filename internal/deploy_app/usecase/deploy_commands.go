@@ -14,8 +14,8 @@ const (
 )
 
 const (
-	HUGGIN_BINARY_URL_U2204 = "https://github.com/Killer-Feature/PaaS_ClientSide/releases/download/v0.0.1/PaaS_22.04"
-	HUGGIN_BINARY_URL_U2004 = "https://github.com/Killer-Feature/PaaS_ClientSide/releases/download/v0.0.1/PaaS_20.04"
+	HUGGIN_BINARY_URL_U2204 = "https://github.com/Killer-Feature/PaaS_ClientSide/releases/download/v0.0.2/PaaS_22.04"
+	HUGGIN_BINARY_URL_U2004 = "https://github.com/Killer-Feature/PaaS_ClientSide/releases/download/v0.0.2/PaaS_20.04"
 )
 
 func getDeployCommands(release cl2.OSRelease) []cl.CommandAndParser {
