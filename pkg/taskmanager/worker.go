@@ -65,7 +65,7 @@ func (w *worker[TKey]) doWork(ctx context.Context) {
 	err := w.task.ProcessTask(w.task.ID)
 	if err != nil {
 		w.logger.TaskError(uint64(w.task.ID), errProcessTask+": "+err.Error())
-		w.done <- struct{}{}
+		close(w.done)
 	}
 
 	select {
