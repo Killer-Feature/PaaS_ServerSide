@@ -7,7 +7,7 @@ import (
 )
 
 type DeployAppUsecase interface {
-	DeployApp(creds *models.SshCreds) (uint64, error)
+	DeployApp(creds *models.SshCreds, progressChan chan models.TaskProgressMsg) (uint64, error)
 }
 
 var (

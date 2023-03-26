@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	ssh2 "github.com/Killer-Feature/PaaS_ServerSide/pkg/client_conn/ssh"
@@ -27,21 +28,45 @@ func NewDeployAppUsecase(sshBuilder cconn.CCBuilder, tm *taskmanager.Manager[net
 	}
 }
 
-func (u *DeployAppUsecase) DeployApp(creds *models.SshCreds) (uint64, error) {
-	taskId, err := u.tm.AddTask(u.DeployAppProcessTask(creds), creds.Addr)
+func newTaskProcessMsg(status models.DeployAppStatus, percent uint8, log []byte, err string) models.TaskProgressMsg {
+	return models.TaskProgressMsg{
+		Status:  status,
+		Percent: percent,
+		Log:     string(log),
+		Error:   err,
+	}
+}
+
+func pushToLog(log []byte, command []byte, output []byte) []byte {
+	return bytes.Join([][]byte{log, append([]byte("$ "), command...), output}, []byte("\n"))
+}
+
+func (u *DeployAppUsecase) DeployApp(creds *models.SshCreds, progressChan chan models.TaskProgressMsg) (uint64, error) {
+	taskId, err := u.tm.AddTask(u.DeployAppProcessTask(creds, progressChan), creds.Addr)
 	if err != nil {
 		return uint64(taskId), errors.Join(ucase.ErrAddingToTaskManager, err)
 	}
+
+	progressChan <- newTaskProcessMsg(models.STATUS_IN_QUEUE, 0, nil, "")
+
 	return uint64(taskId), nil
 }
 
-func (u *DeployAppUsecase) DeployAppProcessTask(creds *models.SshCreds) func(taskId taskmanager.ID) error {
+func (u *DeployAppUsecase) DeployAppProcessTask(creds *models.SshCreds, progressChan chan models.TaskProgressMsg) func(taskId taskmanager.ID) error {
 	return func(taskId taskmanager.ID) error {
-		creds := creds
+		var percent uint8 = 0
+		defer close(progressChan)
+
+		percent = 1
+		progressChan <- newTaskProcessMsg(models.STATUS_START, percent, nil, "")
+
 		sshBuilder := ssh2.NewSSHBuilder()
 		cc, err := sshBuilder.CreateCC(creds.Addr, creds.Login, creds.Password)
+		percent = 5
 		if err != nil {
-			return errors.Join(ucase.ErrCreateCC, err)
+			err = errors.Join(ucase.ErrCreateCC, err)
+			progressChan <- newTaskProcessMsg(models.STATUS_CONN_ERR, percent, nil, errors.Join(ucase.ErrCreateCC, err).Error())
+			return err
 		}
 		defer func(cc cconn.ClientConn) {
 			err := cc.Close()
@@ -50,15 +75,25 @@ func (u *DeployAppUsecase) DeployAppProcessTask(creds *models.SshCreds) func(tas
 			}
 		}(cc)
 
-		osRelease, err := getOSRelease(cc)
+		fmt.Println(creds)
+		progressChan <- newTaskProcessMsg(models.STATUS_IN_PROCESS, percent, nil, "")
+
+		osRelease, log, err := getOSRelease(cc)
+		percent = 10
 		if err != nil {
-			return errors.Join(ucase.ErrorUnsupportedOS, err)
+			err = errors.Join(ucase.ErrorUnsupportedOS, err)
+			progressChan <- newTaskProcessMsg(models.STATUS_ERROR, percent, log, err.Error())
+			return err
 		}
+		progressChan <- newTaskProcessMsg(models.STATUS_IN_PROCESS, percent, log, "")
 
 		deployCommands := getDeployCommands(osRelease)
 		if deployCommands == nil {
+			progressChan <- newTaskProcessMsg(models.STATUS_ERROR, percent, log, ucase.ErrorUnsupportedOS.Error())
 			return ucase.ErrorUnsupportedOS
 		}
+
+		percentStep := (uint8(99) - percent) / uint8(len(deployCommands))
 
 		for _, command := range deployCommands {
 
@@ -71,57 +106,75 @@ func (u *DeployAppUsecase) DeployAppProcessTask(creds *models.SshCreds) func(tas
 			fmt.Println(string(output))
 			fmt.Println("=========end========")
 
+			log = pushToLog(log, []byte(command.Command), output)
+
 			if err != nil {
 				switch {
 				case errors.Is(err, cconn.ErrExitStatus):
 					{
-						return errors.Join(ucase.ErrExecuteDeployInstructions, err)
+						err = errors.Join(ucase.ErrExecuteDeployInstructions, err)
+						progressChan <- newTaskProcessMsg(models.STATUS_ERROR, percent, log, err.Error())
+						return err
 					}
 				case errors.Is(err, cconn.ErrExitStatusMissing):
 					{
-						return errors.Join(ucase.ErrMissingStatusDeployInstructions, err)
+						err = errors.Join(ucase.ErrMissingStatusDeployInstructions, err)
+						progressChan <- newTaskProcessMsg(models.STATUS_ERROR, percent, log, err.Error())
+						return err
 					}
 				case errors.Is(err, cconn.ErrOpenChannel):
 					{
-						return errors.Join(ucase.ErrCreateSession, err)
+						err = errors.Join(ucase.ErrCreateSession, err)
+						progressChan <- newTaskProcessMsg(models.STATUS_ERROR, percent, log, err.Error())
+						return err
 					}
 				default:
 					{
-						return errors.Join(ucase.ErrUnknown, err)
+						err = errors.Join(ucase.ErrUnknown, err)
+						progressChan <- newTaskProcessMsg(models.STATUS_ERROR, percent, log, err.Error())
+						return err
 					}
 				}
 			}
+
+			percent += percentStep
+			progressChan <- newTaskProcessMsg(models.STATUS_IN_PROCESS, percent, log, "")
+
 		}
 
+		progressChan <- newTaskProcessMsg(models.STATUS_SUCCESS, 100, log, "")
 		return nil
 	}
 }
 
-func getOSRelease(cc cconn.ClientConn) (cl2.OSRelease, error) {
+func getOSRelease(cc cconn.ClientConn) (cl2.OSRelease, []byte, error) {
 	osReleaseCommand := cl2.GetOSRelease()
 	output, err := cc.Exec(string(osReleaseCommand.Command))
+
+	var log []byte
+	log = pushToLog(log, []byte(osReleaseCommand.Command), output)
 
 	if err != nil {
 		switch {
 		case errors.Is(err, cconn.ErrExitStatus):
 			{
-				return cl2.UnknownOS, errors.Join(ucase.ErrExecuteDeployInstructions, err)
+				return cl2.UnknownOS, log, errors.Join(ucase.ErrExecuteDeployInstructions, err)
 			}
 		case errors.Is(err, cconn.ErrExitStatusMissing):
 			{
-				return cl2.UnknownOS, errors.Join(ucase.ErrMissingStatusDeployInstructions, err)
+				return cl2.UnknownOS, log, errors.Join(ucase.ErrMissingStatusDeployInstructions, err)
 			}
 		case errors.Is(err, cconn.ErrOpenChannel):
 			{
-				return cl2.UnknownOS, errors.Join(ucase.ErrCreateSession, err)
+				return cl2.UnknownOS, log, errors.Join(ucase.ErrCreateSession, err)
 			}
 		default:
 			{
-				return cl2.UnknownOS, errors.Join(ucase.ErrUnknown, err)
+				return cl2.UnknownOS, log, errors.Join(ucase.ErrUnknown, err)
 			}
 		}
 	}
 	osRelease := cl2.UnknownOS
 	_ = osReleaseCommand.Parser(output, &osRelease)
-	return osRelease, nil
+	return osRelease, log, nil
 }

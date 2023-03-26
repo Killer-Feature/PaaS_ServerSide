@@ -18,6 +18,6 @@ func Register(s *echo.Echo, deployAppHandler deployappdelivery.DeployAppHandler)
 	}
 
 	s.GET("/*", echo.WrapHandler(http.FileServer(http.FS(fsys))))
-	s.POST("/deploy-app", deployAppHandler.DeployApp)
+	s.GET("/deploy-app", deployAppHandler.DeployApp)
 	return nil
 }
