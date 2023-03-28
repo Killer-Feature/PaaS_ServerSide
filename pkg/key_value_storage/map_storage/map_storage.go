@@ -39,3 +39,10 @@ func (m *MapStorage[KeyT, ValT]) GetByKey(key KeyT) (*ValT, error) {
 	}
 	return &val, nil
 }
+
+func (m *MapStorage[KeyT, ValT]) DeleteByKey(key KeyT) error {
+	m.mx.Lock()
+	defer m.mx.Unlock()
+	delete(m.storage, key)
+	return nil
+}

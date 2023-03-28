@@ -11,4 +11,5 @@ var (
 type KeyValueStorage[KeyT comparable, ValT any] interface {
 	Set(key KeyT, val ValT) error
 	GetByKey(key KeyT) (*ValT, error)
+	DeleteByKey(key KeyT) error
 }

@@ -46,7 +46,11 @@ func (p *progressRecorder) commitTaskProcess(status models.DeployAppStatus, perc
 		Error:   errStr,
 	}
 	p.c <- msg
-	err := p.s.Set(p.ip, msg)
+	var err error
+	if status == models.STATUS_SUCCESS {
+		err = p.s.DeleteByKey(p.ip)
+	}
+	err = p.s.Set(p.ip, msg)
 	if err != nil {
 		p.logger.TaskError(p.taskId, ucase.ErrUpdateProgress.Error()+": "+err.Error())
 	}
@@ -66,7 +70,6 @@ func (u *DeployAppUsecase) DeployApp(creds *models.SshCreds, progressChan chan m
 
 	progressRec := progressRecorder{ip: creds.Addr.Addr(), taskId: uint64(taskId), logger: u.logger, c: progressChan, s: u.progressStorage}
 	progressRec.commitTaskProcess(models.STATUS_IN_QUEUE, 0, nil, "")
-
 	return uint64(taskId), nil
 }
 
@@ -152,6 +155,7 @@ func (u *DeployAppUsecase) DeployAppProcessTask(creds *models.SshCreds, progress
 		}
 
 		progressRec.commitTaskProcess(models.STATUS_SUCCESS, 100, log, "")
+
 		return nil
 	}
 }

@@ -55,6 +55,8 @@ func NewDeployAppHandler(logger *servlog.ServLogger, u ucase.DeployAppUsecase) *
 
 func (h *DeployAppHandler) DeployApp(c echo.Context) error {
 	reqId := middleware.GetRequestIdFromCtx(c)
+	// почекать куку
+	// если кука есть -- чекаем стоит ли задача в очереди
 	ws, err := upgrader.Upgrade(c.Response(), c.Request(), nil)
 	if err != nil {
 		h.logger.RequestError(reqId, errUpgradingToWS+err.Error())
