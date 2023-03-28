@@ -26,6 +26,8 @@ func NewServLogger(logger Logger) *ServLogger {
 
 const (
 	AccessMsg           = "access"
+	TaskErrMsg          = "task-error"
+	ReqErrMsg           = "req-error"
 	ReqIdTitle          = "request_id"
 	TaskIdTitle         = "task_id"
 	MethodTitle         = "method"
@@ -35,20 +37,20 @@ const (
 	ErrorMsgTitle       = "error_msg"
 )
 
-func (l ServLogger) Access(requestId uint64, method, remoteAddr, url string, procesingTime time.Duration) {
+func (l ServLogger) Access(requestId uint64, method, remoteAddr, url string, processingTime time.Duration) {
 	l.Logger.Infow(
 		AccessMsg,
 		ReqIdTitle, requestId,
 		MethodTitle, method,
 		RemoteAddrTitle, remoteAddr,
 		UrlTitle, url,
-		ProcessingTimeTitle, procesingTime,
+		ProcessingTimeTitle, processingTime,
 	)
 }
 
 func (l ServLogger) RequestError(reqId uint64, errorMsg string) {
 	l.Logger.Errorw(
-		"req-error",
+		ReqErrMsg,
 		ReqIdTitle, reqId,
 		ErrorMsgTitle, errorMsg,
 	)
@@ -56,7 +58,7 @@ func (l ServLogger) RequestError(reqId uint64, errorMsg string) {
 
 func (l ServLogger) TaskError(taskId uint64, errorMsg string) {
 	l.Logger.Errorw(
-		"task-error",
+		TaskErrMsg,
 		TaskIdTitle, taskId,
 		ErrorMsgTitle, errorMsg,
 	)

@@ -3,8 +3,8 @@ package usecase
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	ssh2 "github.com/Killer-Feature/PaaS_ServerSide/pkg/client_conn/ssh"
+	"github.com/Killer-Feature/PaaS_ServerSide/pkg/key_value_storage"
 	servlog "github.com/Killer-Feature/PaaS_ServerSide/pkg/logger"
 	cl2 "github.com/Killer-Feature/PaaS_ServerSide/pkg/os_command_lib"
 	"net/netip"
@@ -16,24 +16,39 @@ import (
 )
 
 type DeployAppUsecase struct {
-	sshBuilder cconn.CCBuilder
-	tm         *taskmanager.Manager[netip.AddrPort]
-	logger     *servlog.ServLogger
+	sshBuilder      cconn.CCBuilder
+	tm              *taskmanager.Manager[netip.AddrPort]
+	logger          *servlog.ServLogger
+	progressStorage key_value_storage.KeyValueStorage[netip.Addr, models.TaskProgressMsg]
 }
 
-func NewDeployAppUsecase(sshBuilder cconn.CCBuilder, tm *taskmanager.Manager[netip.AddrPort]) ucase.DeployAppUsecase {
+func NewDeployAppUsecase(sshBuilder cconn.CCBuilder, tm *taskmanager.Manager[netip.AddrPort], ps key_value_storage.KeyValueStorage[netip.Addr, models.TaskProgressMsg]) ucase.DeployAppUsecase {
 	return &DeployAppUsecase{
-		sshBuilder: sshBuilder,
-		tm:         tm,
+		sshBuilder:      sshBuilder,
+		tm:              tm,
+		progressStorage: ps,
 	}
 }
 
-func newTaskProcessMsg(status models.DeployAppStatus, percent uint8, log []byte, err string) models.TaskProgressMsg {
-	return models.TaskProgressMsg{
+type progressRecorder struct {
+	ip     netip.Addr
+	taskId uint64
+	c      chan models.TaskProgressMsg
+	s      key_value_storage.KeyValueStorage[netip.Addr, models.TaskProgressMsg]
+	logger *servlog.ServLogger
+}
+
+func (p *progressRecorder) commitTaskProcess(status models.DeployAppStatus, percent uint8, log []byte, errStr string) {
+	msg := models.TaskProgressMsg{
 		Status:  status,
 		Percent: percent,
 		Log:     string(log),
-		Error:   err,
+		Error:   errStr,
+	}
+	p.c <- msg
+	err := p.s.Set(p.ip, msg)
+	if err != nil {
+		p.logger.TaskError(p.taskId, ucase.ErrUpdateProgress.Error()+": "+err.Error())
 	}
 }
 
@@ -44,28 +59,32 @@ func pushToLog(log []byte, command []byte, output []byte) []byte {
 func (u *DeployAppUsecase) DeployApp(creds *models.SshCreds, progressChan chan models.TaskProgressMsg) (uint64, error) {
 	taskId, err := u.tm.AddTask(u.DeployAppProcessTask(creds, progressChan), creds.Addr)
 	if err != nil {
-		return uint64(taskId), errors.Join(ucase.ErrAddingToTaskManager, err)
+		err = errors.Join(ucase.ErrAddingToTaskManager, err)
+		u.logger.TaskError(uint64(taskId), err.Error())
+		return uint64(taskId), err
 	}
 
-	progressChan <- newTaskProcessMsg(models.STATUS_IN_QUEUE, 0, nil, "")
+	progressRec := progressRecorder{ip: creds.Addr.Addr(), taskId: uint64(taskId), logger: u.logger, c: progressChan, s: u.progressStorage}
+	progressRec.commitTaskProcess(models.STATUS_IN_QUEUE, 0, nil, "")
 
 	return uint64(taskId), nil
 }
 
 func (u *DeployAppUsecase) DeployAppProcessTask(creds *models.SshCreds, progressChan chan models.TaskProgressMsg) func(taskId taskmanager.ID) error {
 	return func(taskId taskmanager.ID) error {
+		progressRec := progressRecorder{ip: creds.Addr.Addr(), taskId: uint64(taskId), logger: u.logger, c: progressChan, s: u.progressStorage}
 		var percent uint8 = 0
 		defer close(progressChan)
 
 		percent = 1
-		progressChan <- newTaskProcessMsg(models.STATUS_START, percent, nil, "")
+		progressRec.commitTaskProcess(models.STATUS_START, percent, nil, "")
 
 		sshBuilder := ssh2.NewSSHBuilder()
 		cc, err := sshBuilder.CreateCC(creds.Addr, creds.Login, creds.Password)
 		percent = 5
 		if err != nil {
 			err = errors.Join(ucase.ErrCreateCC, err)
-			progressChan <- newTaskProcessMsg(models.STATUS_CONN_ERR, percent, nil, errors.Join(ucase.ErrCreateCC, err).Error())
+			progressRec.commitTaskProcess(models.STATUS_CONN_ERR, percent, nil, err.Error())
 			return err
 		}
 		defer func(cc cconn.ClientConn) {
@@ -75,37 +94,28 @@ func (u *DeployAppUsecase) DeployAppProcessTask(creds *models.SshCreds, progress
 			}
 		}(cc)
 
-		fmt.Println(creds)
-		progressChan <- newTaskProcessMsg(models.STATUS_IN_PROCESS, percent, nil, "")
+		progressRec.commitTaskProcess(models.STATUS_IN_PROCESS, percent, nil, "")
 
 		osRelease, log, err := getOSRelease(cc)
 		percent = 10
 		if err != nil {
-			err = errors.Join(ucase.ErrorUnsupportedOS, err)
-			progressChan <- newTaskProcessMsg(models.STATUS_ERROR, percent, log, err.Error())
+			err = errors.Join(ucase.ErrUnsupportedOS, err)
+			progressRec.commitTaskProcess(models.STATUS_ERROR, percent, log, err.Error())
 			return err
 		}
-		progressChan <- newTaskProcessMsg(models.STATUS_IN_PROCESS, percent, log, "")
+
+		progressRec.commitTaskProcess(models.STATUS_IN_PROCESS, percent, log, "")
 
 		deployCommands := getDeployCommands(osRelease)
 		if deployCommands == nil {
-			progressChan <- newTaskProcessMsg(models.STATUS_ERROR, percent, log, ucase.ErrorUnsupportedOS.Error())
-			return ucase.ErrorUnsupportedOS
+			progressRec.commitTaskProcess(models.STATUS_ERROR, percent, log, ucase.ErrUnsupportedOS.Error())
+			return ucase.ErrUnsupportedOS
 		}
 
 		percentStep := (uint8(99) - percent) / uint8(len(deployCommands))
 
 		for _, command := range deployCommands {
-
-			fmt.Println("=========command========")
-			fmt.Println(command)
-
 			output, err := cc.Exec(command.String())
-
-			fmt.Println(err)
-			fmt.Println(string(output))
-			fmt.Println("=========end========")
-
 			log = pushToLog(log, []byte(command.Command), output)
 
 			if err != nil {
@@ -113,36 +123,35 @@ func (u *DeployAppUsecase) DeployAppProcessTask(creds *models.SshCreds, progress
 				case errors.Is(err, cconn.ErrExitStatus):
 					{
 						err = errors.Join(ucase.ErrExecuteDeployInstructions, err)
-						progressChan <- newTaskProcessMsg(models.STATUS_ERROR, percent, log, err.Error())
+						progressRec.commitTaskProcess(models.STATUS_ERROR, percent, log, err.Error())
 						return err
 					}
 				case errors.Is(err, cconn.ErrExitStatusMissing):
 					{
 						err = errors.Join(ucase.ErrMissingStatusDeployInstructions, err)
-						progressChan <- newTaskProcessMsg(models.STATUS_ERROR, percent, log, err.Error())
+						progressRec.commitTaskProcess(models.STATUS_ERROR, percent, log, err.Error())
 						return err
 					}
 				case errors.Is(err, cconn.ErrOpenChannel):
 					{
 						err = errors.Join(ucase.ErrCreateSession, err)
-						progressChan <- newTaskProcessMsg(models.STATUS_ERROR, percent, log, err.Error())
+						progressRec.commitTaskProcess(models.STATUS_ERROR, percent, log, err.Error())
 						return err
 					}
 				default:
 					{
 						err = errors.Join(ucase.ErrUnknown, err)
-						progressChan <- newTaskProcessMsg(models.STATUS_ERROR, percent, log, err.Error())
+						progressRec.commitTaskProcess(models.STATUS_ERROR, percent, log, err.Error())
 						return err
 					}
 				}
 			}
 
 			percent += percentStep
-			progressChan <- newTaskProcessMsg(models.STATUS_IN_PROCESS, percent, log, "")
-
+			progressRec.commitTaskProcess(models.STATUS_IN_PROCESS, percent, log, "")
 		}
 
-		progressChan <- newTaskProcessMsg(models.STATUS_SUCCESS, 100, log, "")
+		progressRec.commitTaskProcess(models.STATUS_SUCCESS, 100, log, "")
 		return nil
 	}
 }

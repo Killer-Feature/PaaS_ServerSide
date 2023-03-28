@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"fmt"
 	ucase "github.com/Killer-Feature/PaaS_ServerSide/internal/deploy_app"
 	"github.com/Killer-Feature/PaaS_ServerSide/internal/handlers/middleware"
 	"github.com/Killer-Feature/PaaS_ServerSide/internal/models"
@@ -73,24 +72,29 @@ func (h *DeployAppHandler) DeployApp(c echo.Context) error {
 	err = ws.SetReadDeadline(time.Now().Add(READ_CREDS_MSG_TIMEOUT * time.Second))
 	if err != nil {
 		h.logger.RequestError(reqId, errSetReadWSTimeout+err.Error())
-		return err
+		_ = ws.WriteJSON(models.Error{Error: HttpErrUpgradeToWS, Code: http.StatusBadRequest})
+		return nil
 	}
 	err = ws.ReadJSON(&req)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, HttpErrorBindingParams)
+		_ = ws.WriteJSON(models.Error{Error: HttpErrorBindingParams, Code: http.StatusBadRequest})
+		return nil
 	}
 
 	ip, err := netip.ParseAddr(req.IP)
 	if err != nil || !ip.Is4() || ip.IsLoopback() || ip.IsPrivate() {
-		return echo.NewHTTPError(http.StatusBadRequest, HttpErrorValidateIP)
+		_ = ws.WriteJSON(models.Error{Error: HttpErrorValidateIP, Code: http.StatusBadRequest})
+		return nil
 	}
 	if req.Port == 0 {
-		return echo.NewHTTPError(http.StatusBadRequest, HttpErrorValidatePort)
+		_ = ws.WriteJSON(models.Error{Error: HttpErrorValidatePort, Code: http.StatusBadRequest})
+		return nil
 	}
 
 	ipPort := netip.AddrPortFrom(ip, req.Port)
 	if !ipPort.IsValid() {
-		return echo.NewHTTPError(http.StatusBadRequest, HttpErrorValidateAddr)
+		_ = ws.WriteJSON(models.Error{Error: HttpErrorValidateAddr, Code: http.StatusBadRequest})
+		return nil
 	}
 
 	progressChan := make(chan models.TaskProgressMsg, DEPLOY_PROGRESS_CHAN_SIZE)
@@ -101,18 +105,17 @@ func (h *DeployAppHandler) DeployApp(c echo.Context) error {
 	}, progressChan)
 
 	if err != nil {
+		_ = ws.WriteJSON(models.Error{Error: HttpErrInternal, Code: http.StatusInternalServerError})
 		h.logger.RequestError(reqId, errAddDeployTaskToTaskManager+": "+err.Error())
-		return echo.NewHTTPError(http.StatusInternalServerError, HttpErrInternal)
+		return nil
 	}
 
 	h.deployApp(reqId, ws, progressChan)
-
-	return c.NoContent(http.StatusOK)
+	return nil
 }
 
 func (h *DeployAppHandler) deployApp(reqId uint64, client *websocket.Conn, progressChan chan models.TaskProgressMsg) {
 	for msg := range progressChan {
-		fmt.Println(msg)
 		err := client.WriteJSON(msg)
 		if err != nil {
 			h.logger.RequestError(reqId, err.Error())
