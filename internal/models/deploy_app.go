@@ -27,10 +27,12 @@ const (
 )
 
 type TaskProgressMsg struct {
-	Log     string          `json:"log"`
-	Percent uint8           `json:"percent"`
-	Error   string          `json:"error"`
-	Status  DeployAppStatus `json:"status"`
+	Log     string                `json:"log"`
+	Percent uint8                 `json:"percent"`
+	Error   string                `json:"error"`
+	Status  DeployAppStatus       `json:"status"`
+	Chan    *chan TaskProgressMsg `json:"-"`
+	TaskId  uint64                `json:"-"`
 }
 
 type Error struct {

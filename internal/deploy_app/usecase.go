@@ -2,12 +2,18 @@ package deploy_app
 
 import (
 	"errors"
+	"net/netip"
 
 	"github.com/Killer-Feature/PaaS_ServerSide/internal/models"
 )
 
+const (
+	DEPLOY_PROGRESS_CHAN_SIZE = 1024
+)
+
 type DeployAppUsecase interface {
-	DeployApp(creds *models.SshCreds, progressChan chan models.TaskProgressMsg) (uint64, error)
+	DeployApp(creds *models.SshCreds) (uint64, error)
+	ProgressInfo(ip *netip.Addr) (*models.TaskProgressMsg, error)
 }
 
 var (
@@ -20,4 +26,5 @@ var (
 	ErrCreateCC                        = errors.New("error creating new ssh connection")
 	ErrCloseCC                         = errors.New("error closing ssh connection")
 	ErrUpdateProgress                  = errors.New("error updating task progress at storage")
+	ErrSuchIPISNotProcessing           = errors.New("error this IP is not processing")
 )

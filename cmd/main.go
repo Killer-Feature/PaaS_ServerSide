@@ -76,7 +76,7 @@ func main() {
 		middlewares.RequestIdMiddleware,
 		middlewares.AccessLogMiddleware,
 		middlewares.PanicMiddleware,
-		echomiddleware.CORSWithConfig(middleware.GetCorsConfig([]string{"", "http://localhost:3000"}, 86400)),
+		echomiddleware.CORSWithConfig(middleware.GetCorsConfig([]string{"", "http://localhost:8080"}, 86400)),
 	}
 	server.Use(mwChain...)
 

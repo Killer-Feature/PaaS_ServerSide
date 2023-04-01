@@ -22,7 +22,7 @@ type DeployAppUsecase struct {
 	progressStorage key_value_storage.KeyValueStorage[netip.Addr, models.TaskProgressMsg]
 }
 
-func NewDeployAppUsecase(sshBuilder cconn.CCBuilder, tm *taskmanager.Manager[netip.AddrPort], ps key_value_storage.KeyValueStorage[netip.Addr, models.TaskProgressMsg]) ucase.DeployAppUsecase {
+func NewDeployAppUsecase(sshBuilder cconn.CCBuilder, tm *taskmanager.Manager[netip.AddrPort], ps key_value_storage.KeyValueStorage[netip.Addr, models.TaskProgressMsg]) *DeployAppUsecase {
 	return &DeployAppUsecase{
 		sshBuilder:      sshBuilder,
 		tm:              tm,
@@ -33,7 +33,7 @@ func NewDeployAppUsecase(sshBuilder cconn.CCBuilder, tm *taskmanager.Manager[net
 type progressRecorder struct {
 	ip     netip.Addr
 	taskId uint64
-	c      chan models.TaskProgressMsg
+	c      *chan models.TaskProgressMsg
 	s      key_value_storage.KeyValueStorage[netip.Addr, models.TaskProgressMsg]
 	logger *servlog.ServLogger
 }
@@ -44,13 +44,15 @@ func (p *progressRecorder) commitTaskProcess(status models.DeployAppStatus, perc
 		Percent: percent,
 		Log:     string(log),
 		Error:   errStr,
+		Chan:    p.c,
+		TaskId:  p.taskId,
 	}
-	p.c <- msg
+	*p.c <- msg
 	var err error
 	if status == models.STATUS_SUCCESS {
-		err = p.s.DeleteByKey(p.ip)
+		err = p.s.DeleteByKey(&p.ip)
 	}
-	err = p.s.Set(p.ip, msg)
+	err = p.s.Set(&p.ip, &msg)
 	if err != nil {
 		p.logger.TaskError(p.taskId, ucase.ErrUpdateProgress.Error()+": "+err.Error())
 	}
@@ -60,26 +62,26 @@ func pushToLog(log []byte, command []byte, output []byte) []byte {
 	return bytes.Join([][]byte{log, append([]byte("$ "), command...), output}, []byte("\n"))
 }
 
-func (u *DeployAppUsecase) DeployApp(creds *models.SshCreds, progressChan chan models.TaskProgressMsg) (uint64, error) {
-	taskId, err := u.tm.AddTask(u.DeployAppProcessTask(creds, progressChan), creds.Addr)
+func (u *DeployAppUsecase) DeployApp(creds *models.SshCreds) (uint64, error) {
+	progressChan := make(chan models.TaskProgressMsg, ucase.DEPLOY_PROGRESS_CHAN_SIZE)
+	taskId, err := u.tm.AddTask(u.DeployAppProcessTask(creds, &progressChan), creds.Addr)
 	if err != nil {
 		err = errors.Join(ucase.ErrAddingToTaskManager, err)
 		u.logger.TaskError(uint64(taskId), err.Error())
 		return uint64(taskId), err
 	}
 
-	progressRec := progressRecorder{ip: creds.Addr.Addr(), taskId: uint64(taskId), logger: u.logger, c: progressChan, s: u.progressStorage}
+	progressRec := progressRecorder{ip: creds.Addr.Addr(), taskId: uint64(taskId), logger: u.logger, c: &progressChan, s: u.progressStorage}
 	progressRec.commitTaskProcess(models.STATUS_IN_QUEUE, 0, nil, "")
 	return uint64(taskId), nil
 }
 
-func (u *DeployAppUsecase) DeployAppProcessTask(creds *models.SshCreds, progressChan chan models.TaskProgressMsg) func(taskId taskmanager.ID) error {
+func (u *DeployAppUsecase) DeployAppProcessTask(creds *models.SshCreds, progressChan *chan models.TaskProgressMsg) func(taskId taskmanager.ID) error {
 	return func(taskId taskmanager.ID) error {
 		progressRec := progressRecorder{ip: creds.Addr.Addr(), taskId: uint64(taskId), logger: u.logger, c: progressChan, s: u.progressStorage}
-		var percent uint8 = 0
-		defer close(progressChan)
+		var percent uint8 = 1
+		defer close(*progressChan)
 
-		percent = 1
 		progressRec.commitTaskProcess(models.STATUS_START, percent, nil, "")
 
 		sshBuilder := ssh2.NewSSHBuilder()
@@ -109,6 +111,7 @@ func (u *DeployAppUsecase) DeployAppProcessTask(creds *models.SshCreds, progress
 
 		progressRec.commitTaskProcess(models.STATUS_IN_PROCESS, percent, log, "")
 
+		percent = 11
 		deployCommands := getDeployCommands(osRelease)
 		if deployCommands == nil {
 			progressRec.commitTaskProcess(models.STATUS_ERROR, percent, log, ucase.ErrUnsupportedOS.Error())
@@ -190,4 +193,16 @@ func getOSRelease(cc cconn.ClientConn) (cl2.OSRelease, []byte, error) {
 	osRelease := cl2.UnknownOS
 	_ = osReleaseCommand.Parser(output, &osRelease)
 	return osRelease, log, nil
+}
+func (u *DeployAppUsecase) ProgressInfo(ip *netip.Addr) (*models.TaskProgressMsg, error) {
+	progressInfo, err := u.progressStorage.GetByKey(ip)
+	if err != nil {
+		if errors.Is(err, key_value_storage.ErrNoSuchElem) {
+			return nil, errors.Join(err, ucase.ErrSuchIPISNotProcessing)
+		}
+		err = errors.Join(err, ucase.ErrUnknown)
+		u.logger.TaskError(uint64(progressInfo.TaskId), err.Error())
+		return nil, err
+	}
+	return progressInfo, nil
 }

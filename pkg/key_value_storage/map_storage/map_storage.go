@@ -1,7 +1,6 @@
 package map_storage
 
 import (
-	"fmt"
 	"github.com/Killer-Feature/PaaS_ServerSide/pkg/key_value_storage"
 	"sync"
 )
@@ -22,27 +21,26 @@ func NewMapStorage[KeyT comparable, ValT any]() *MapStorage[KeyT, ValT] {
 	}
 }
 
-func (m *MapStorage[KeyT, ValT]) Set(key KeyT, val ValT) error {
+func (m *MapStorage[KeyT, ValT]) Set(key *KeyT, val *ValT) error {
 	m.mx.Lock()
 	defer m.mx.Unlock()
-	m.storage[key] = val
-	fmt.Println(m.storage) // TODO: delete
+	m.storage[*key] = *val
 	return nil
 }
 
-func (m *MapStorage[KeyT, ValT]) GetByKey(key KeyT) (*ValT, error) {
+func (m *MapStorage[KeyT, ValT]) GetByKey(key *KeyT) (*ValT, error) {
 	m.mx.RLock()
 	defer m.mx.RUnlock()
-	val, ok := m.storage[key]
+	val, ok := m.storage[*key]
 	if !ok {
 		return nil, key_value_storage.ErrNoSuchElem
 	}
 	return &val, nil
 }
 
-func (m *MapStorage[KeyT, ValT]) DeleteByKey(key KeyT) error {
+func (m *MapStorage[KeyT, ValT]) DeleteByKey(key *KeyT) error {
 	m.mx.Lock()
 	defer m.mx.Unlock()
-	delete(m.storage, key)
+	delete(m.storage, *key)
 	return nil
 }
