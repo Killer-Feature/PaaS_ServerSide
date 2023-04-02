@@ -8,6 +8,7 @@ import (
 	servlog "github.com/Killer-Feature/PaaS_ServerSide/pkg/logger"
 	"github.com/gorilla/websocket"
 	"github.com/labstack/echo/v4"
+	"net"
 	"net/http"
 	"net/netip"
 	"time"
@@ -25,7 +26,6 @@ var (
 	HttpErrValidatePort          = "Передан невалидный порт. Пожалуйста, укажите ненулевой порт."
 	HttpErrValidateAddr          = "Передан невалидный IP-адрес или порт. Пожалуйста, укажите глобальный IPv4 адрес и ненулевой порт."
 	HttpErrInternal              = "Внутренняя ошибка сервера."
-	HttpErrUpgradeToWS           = "Ошибка соединения с сервером"
 	HttpErrSuchIPISNotProcessing = "Не найдена информация по процессу деплоя huginn на данном ip адресе"
 )
 
@@ -86,24 +86,16 @@ func (h *DeployAppHandler) DeployApp(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, HttpErrInternal)
 	}
 
-	//host, _, _ := net.SplitHostPort(c.Request().Host)
-	cookie := new(http.Cookie)
-	cookie.Name = DEPLOY_APP_COOKIE_NAME
-	cookie.Value = ip.String()
-	cookie.Expires = time.Now().Add(24 * time.Hour)
-	//cookie.Domain = host
-	cookie.Path = "/"
-	c.SetCookie(cookie)
-
+	host, _, _ := net.SplitHostPort(c.Request().Host)
 	c.SetCookie(&http.Cookie{
-		Expires: time.Now().Add(24 * time.Hour),
-		Secure:  false,
-		//SameSite: http.SameSiteLaxMode,
-		HttpOnly: false,
+		Expires:  time.Now().Add(24 * time.Hour),
+		Secure:   false,
+		SameSite: http.SameSiteNoneMode,
+		HttpOnly: true,
 		Name:     DEPLOY_APP_COOKIE_NAME,
 		Value:    ip.String(),
-		//Domain:   host,
-		Path: "/",
+		Domain:   host,
+		Path:     "/",
 	})
 
 	return c.NoContent(http.StatusOK)
@@ -111,31 +103,11 @@ func (h *DeployAppHandler) DeployApp(c echo.Context) error {
 
 func (h *DeployAppHandler) Deploying(c echo.Context) error {
 	reqId := middleware.GetRequestIdFromCtx(c)
-	ipCookie, err := c.Cookie(DEPLOY_APP_COOKIE_NAME)
-	if err != nil {
-		return c.NoContent(http.StatusOK)
-	}
-
-	ip, err := netip.ParseAddr(ipCookie.Value)
-	if err != nil || !ip.Is4() || ip.IsLoopback() || ip.IsPrivate() {
-		return echo.NewHTTPError(http.StatusBadRequest, HttpErrValidateIP)
-	}
-
-	progressInfo, err := h.u.ProgressInfo(&ip)
-
-	if err != nil {
-		if errors.Is(err, ucase.ErrSuchIPISNotProcessing) {
-			h.logger.RequestError(reqId, errGetProgressInfo+": "+err.Error())
-			return echo.NewHTTPError(http.StatusBadRequest, HttpErrSuchIPISNotProcessing)
-		}
-		h.logger.RequestError(reqId, errGetProgressInfo+": "+err.Error())
-		return echo.NewHTTPError(http.StatusInternalServerError, HttpErrInternal)
-	}
 
 	ws, err := upgrader.Upgrade(c.Response(), c.Request(), nil)
 	if err != nil {
 		h.logger.RequestError(reqId, errUpgradingToWS+err.Error())
-		return echo.NewHTTPError(http.StatusBadRequest, HttpErrUpgradeToWS)
+		return nil
 	}
 	defer func(ws *websocket.Conn) {
 		err := ws.Close()
@@ -143,6 +115,30 @@ func (h *DeployAppHandler) Deploying(c echo.Context) error {
 			h.logger.RequestError(reqId, errCloseWSConn+err.Error())
 		}
 	}(ws)
+
+	ipCookie, err := c.Cookie(DEPLOY_APP_COOKIE_NAME)
+	if err != nil {
+		return nil
+	}
+
+	ip, err := netip.ParseAddr(ipCookie.Value)
+	if err != nil || !ip.Is4() || ip.IsLoopback() || ip.IsPrivate() {
+		_ = ws.WriteJSON(models.Error{Error: HttpErrValidateIP, Code: http.StatusBadRequest})
+		return nil
+	}
+
+	progressInfo, err := h.u.ProgressInfo(&ip)
+
+	if err != nil {
+		if errors.Is(err, ucase.ErrSuchIPISNotProcessing) {
+			h.logger.RequestError(reqId, errGetProgressInfo+": "+err.Error())
+			_ = ws.WriteJSON(models.Error{Error: HttpErrSuchIPISNotProcessing, Code: http.StatusBadRequest})
+			return nil
+		}
+		h.logger.RequestError(reqId, errGetProgressInfo+": "+err.Error())
+		_ = ws.WriteJSON(models.Error{Error: HttpErrInternal, Code: http.StatusInternalServerError})
+		return nil
+	}
 
 	h.deploying(reqId, ws, progressInfo)
 	return nil
