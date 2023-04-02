@@ -3,7 +3,6 @@ package taskmanager
 import (
 	"context"
 	servlog "github.com/Killer-Feature/PaaS_ServerSide/pkg/logger"
-	"sync"
 	"sync/atomic"
 )
 
@@ -43,7 +42,6 @@ func (m *Manager[_]) deleteTask(ID ID) {
 type ConnectType int
 
 type Task[TKey comparable] struct {
-	mu          sync.RWMutex
 	Key         TKey
 	ID          ID
 	ProcessTask func(taskID ID) error

@@ -3,15 +3,15 @@ module github.com/Killer-Feature/PaaS_ServerSide
 go 1.20
 
 require (
+	github.com/Killer-Feature/PaaS_ClientSide v0.0.2-0.20230319190054-7bfcb3348834
+	github.com/gorilla/websocket v1.5.0
 	github.com/labstack/echo/v4 v4.10.2
 	go.uber.org/zap v1.24.0
 	golang.org/x/crypto v0.6.0
 	golang.org/x/sync v0.1.0
 )
 
-
 require (
-	github.com/Killer-Feature/PaaS_ClientSide v0.0.2-0.20230319190054-7bfcb3348834 // indirect
 	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/labstack/gommon v0.4.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
