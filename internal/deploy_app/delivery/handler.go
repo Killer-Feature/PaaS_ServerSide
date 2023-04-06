@@ -123,7 +123,7 @@ func (h *DeployAppHandler) Deploying(c echo.Context) error {
 
 	ip, err := netip.ParseAddr(ipCookie.Value)
 	if err != nil || !ip.Is4() || ip.IsLoopback() || ip.IsPrivate() {
-		_ = ws.WriteJSON(models.Error{Error: HttpErrValidateIP, Code: http.StatusBadRequest})
+		_ = ws.WriteJSON(models.TaskProgressMsg{Error: HttpErrValidateIP, Percent: 0, Status: models.STATUS_ERROR})
 		return nil
 	}
 
@@ -132,11 +132,11 @@ func (h *DeployAppHandler) Deploying(c echo.Context) error {
 	if err != nil {
 		if errors.Is(err, ucase.ErrSuchIPISNotProcessing) {
 			h.logger.RequestError(reqId, errGetProgressInfo+": "+err.Error())
-			_ = ws.WriteJSON(models.Error{Error: HttpErrSuchIPISNotProcessing, Code: http.StatusBadRequest})
+			_ = ws.WriteJSON(models.TaskProgressMsg{Error: HttpErrSuchIPISNotProcessing, Percent: 0, Status: models.STATUS_ERROR})
 			return nil
 		}
 		h.logger.RequestError(reqId, errGetProgressInfo+": "+err.Error())
-		_ = ws.WriteJSON(models.Error{Error: HttpErrInternal, Code: http.StatusInternalServerError})
+		_ = ws.WriteJSON(models.TaskProgressMsg{Error: HttpErrInternal, Percent: 0, Status: models.STATUS_ERROR})
 		return nil
 	}
 

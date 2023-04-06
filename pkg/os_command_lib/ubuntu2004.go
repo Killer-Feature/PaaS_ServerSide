@@ -21,7 +21,7 @@ func (_ Ubuntu2004CommandLib) RunBinaryCommand(path string) cl.CommandAndParser 
 
 func (u Ubuntu2004CommandLib) RunBinaryNohupBackground(path string, output string) cl.CommandAndParser {
 	return cl.CommandAndParser{
-		Command:   cl.Command(fmt.Sprintf("nohup ./%s > %s 2>&1 &", path, output)),
+		Command:   cl.Command(fmt.Sprintf("sudo nohup ./%s > %s 2>&1 &", path, output)),
 		Parser:    nil,
 		Condition: cl.Required,
 	}
@@ -61,7 +61,7 @@ func (_ Ubuntu2004CommandLib) Chmod777(path string) cl.CommandAndParser {
 
 func (_ Ubuntu2004CommandLib) AssertHasProcessListeningPort(port uint16) cl.CommandAndParser {
 	return cl.CommandAndParser{
-		Command:   cl.Command(fmt.Sprintf("if [[ $(lsof -i:%d) ]]; then  exit %d; fi", port, ResourceAlreadyBusy)),
+		Command:   cl.Command(fmt.Sprintf("if [[ $(sudo lsof -i:%d) ]]; then  exit %d; fi", port, ResourceAlreadyBusy)),
 		Parser:    nil,
 		Condition: cl.Required,
 	}
