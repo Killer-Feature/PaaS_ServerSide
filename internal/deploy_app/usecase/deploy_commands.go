@@ -7,15 +7,15 @@ import (
 )
 
 const (
-	HUGINN_LISTENING_PORT uint16 = 8091
+	HUGINN_LISTENING_PORT uint16 = 80
 	HUGINN_DIR                   = "huginn"
 	HUGINN_BINARY_NAME           = "HUGINN"
 	NOHUP_OUTPUT_NAME            = "nohup_output"
 )
 
 const (
-	HUGINN_BINARY_URL_U2204 = "https://github.com/Killer-Feature/PaaS_ClientSide/releases/download/v0.0.2/PaaS_22.04"
-	HUGINN_BINARY_URL_U2004 = "https://github.com/Killer-Feature/PaaS_ClientSide/releases/download/v0.0.2/PaaS_20.04"
+	HUGINN_BINARY_URL_U2204 = "https://github.com/Killer-Feature/PaaS_ClientSide/releases/download/v0.0.4/PaaS_22.04"
+	HUGINN_BINARY_URL_U2004 = "https://github.com/Killer-Feature/PaaS_ClientSide/releases/download/v0.0.4/PaaS_20.04"
 )
 
 func getDeployCommands(release cl2.OSRelease) []cl.CommandAndParser {

@@ -123,8 +123,10 @@ func (u *DeployAppUsecase) DeployAppProcessTask(creds *models.SshCreds, progress
 		for _, command := range deployCommands {
 			output, err := cc.Exec(command.String())
 			log = pushToLog(log, []byte(command.Command), output)
-
+			//fmt.Println(command.Command)
+			//fmt.Println(string(output))
 			if err != nil {
+				//fmt.Println(err.Error())
 				switch {
 				case errors.Is(err, cconn.ErrExitStatus):
 					{

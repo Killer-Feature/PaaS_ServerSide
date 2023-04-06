@@ -34,8 +34,3 @@ type TaskProgressMsg struct {
 	Chan    *chan TaskProgressMsg `json:"-"`
 	TaskId  uint64                `json:"-"`
 }
-
-type Error struct {
-	Error string `json:"error"`
-	Code  int    `json:"code"`
-}
