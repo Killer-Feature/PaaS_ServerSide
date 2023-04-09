@@ -14,8 +14,8 @@ const (
 )
 
 const (
-	HUGINN_BINARY_URL_U2204 = "https://github.com/Killer-Feature/PaaS_ClientSide/releases/download/v0.0.4/PaaS_22.04"
-	HUGINN_BINARY_URL_U2004 = "https://github.com/Killer-Feature/PaaS_ClientSide/releases/download/v0.0.4/PaaS_20.04"
+	HUGINN_BINARY_URL_U2204 = "https://github.com/Killer-Feature/PaaS_ClientSide/releases/latest/download/PaaS_22.04"
+	HUGINN_BINARY_URL_U2004 = "https://github.com/Killer-Feature/PaaS_ClientSide/releases/latest/download/PaaS_20.04"
 )
 
 func getDeployCommands(release cl2.OSRelease) []cl.CommandAndParser {
@@ -27,7 +27,7 @@ func getDeployCommands(release cl2.OSRelease) []cl.CommandAndParser {
 			os := cl2.Ubuntu2204CommandLib{}
 			return []cl.CommandAndParser{
 				os.AssertHasProcessListeningPort(HUGINN_LISTENING_PORT),
-				os.Rmdir(HUGINN_DIR),
+				os.RmFile(binaryPath),
 				os.Mkdir(HUGINN_DIR),
 				os.LoadWebResource(HUGINN_BINARY_URL_U2204, binaryPath),
 				os.Chmod777(binaryPath),
@@ -41,7 +41,7 @@ func getDeployCommands(release cl2.OSRelease) []cl.CommandAndParser {
 			os := cl2.Ubuntu2004CommandLib{}
 			return []cl.CommandAndParser{
 				os.AssertHasProcessListeningPort(HUGINN_LISTENING_PORT),
-				os.Rmdir(HUGINN_DIR),
+				os.RmFile(binaryPath),
 				os.Mkdir(HUGINN_DIR),
 				os.LoadWebResource(HUGINN_BINARY_URL_U2004, binaryPath),
 				os.Chmod777(binaryPath),

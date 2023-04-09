@@ -23,9 +23,9 @@ func (u Ubuntu2204CommandLib) RunBinaryNohupBackground(path string, output strin
 	}
 }
 
-func (_ Ubuntu2204CommandLib) Rmdir(path string) cl.CommandAndParser {
+func (_ Ubuntu2204CommandLib) RmFile(path string) cl.CommandAndParser {
 	return cl.CommandAndParser{
-		Command:   cl.Command("rm -rf " + path),
+		Command:   cl.Command("rm -f " + path),
 		Parser:    nil,
 		Condition: cl.Required,
 	}
@@ -33,7 +33,7 @@ func (_ Ubuntu2204CommandLib) Rmdir(path string) cl.CommandAndParser {
 
 func (_ Ubuntu2204CommandLib) Mkdir(path string) cl.CommandAndParser {
 	return cl.CommandAndParser{
-		Command:   cl.Command("mkdir " + path),
+		Command:   cl.Command("mkdir -p " + path),
 		Parser:    nil,
 		Condition: cl.Required,
 	}
