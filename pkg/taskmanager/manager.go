@@ -70,7 +70,7 @@ func (m *Manager[TKey]) AddTask(processTask func(taskId ID) error, key TKey) (ID
 	task := &Task[TKey]{
 		Key:         key,
 		ID:          ID(id),
-		ProcessTask: processTask,
+		ProcessTask: m.recoveryMW(processTask),
 		callback:    m.deleteTask,
 	}
 
@@ -82,4 +82,16 @@ func (m *Manager[TKey]) AddTask(processTask func(taskId ID) error, key TKey) (ID
 	}()
 
 	return ID(id), nil
+}
+
+func (m *Manager[TKey]) recoveryMW(next func(taskId ID) error) func(taskId ID) error {
+	return func(taskId ID) error {
+		defer func() {
+			err := recover()
+			if err != nil {
+				m.logger.TaskError(uint64(taskId), errFindTask)
+			}
+		}()
+		return next(taskId)
+	}
 }
