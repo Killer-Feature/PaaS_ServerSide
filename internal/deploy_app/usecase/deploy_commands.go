@@ -18,7 +18,7 @@ const (
 	HUGINN_BINARY_URL_U2004 = "https://github.com/Killer-Feature/PaaS_ClientSide/releases/download/v0.0.4/PaaS_20.04"
 )
 
-func getDeployCommands(release cl2.OSRelease) []cl.CommandAndParser {
+func getDeployCommands(release cl2.OSRelease, user, password string) []cl.CommandAndParser {
 	binaryPath := filepath.Join(HUGINN_DIR, HUGINN_BINARY_NAME)
 	outputPath := filepath.Join(HUGINN_DIR, NOHUP_OUTPUT_NAME)
 	switch release {
@@ -32,7 +32,7 @@ func getDeployCommands(release cl2.OSRelease) []cl.CommandAndParser {
 				os.LoadWebResource(HUGINN_BINARY_URL_U2204, binaryPath),
 				os.Chmod777(binaryPath),
 				os.CreateFile(outputPath),
-				os.RunBinaryNohupBackground(binaryPath, outputPath),
+				os.RunBinaryNohupBackground(binaryPath, outputPath).WithArgs("--user="+user, "--password="+password),
 			}
 		}
 
@@ -46,7 +46,7 @@ func getDeployCommands(release cl2.OSRelease) []cl.CommandAndParser {
 				os.LoadWebResource(HUGINN_BINARY_URL_U2004, binaryPath),
 				os.Chmod777(binaryPath),
 				os.CreateFile(outputPath),
-				os.RunBinaryNohupBackground(binaryPath, outputPath),
+				os.RunBinaryNohupBackground(binaryPath, outputPath).WithArgs("--user="+user, "--password="+password),
 			}
 		}
 	default:

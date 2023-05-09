@@ -112,7 +112,7 @@ func (u *DeployAppUsecase) DeployAppProcessTask(creds *models.SshCreds, progress
 		progressRec.commitTaskProcess(models.STATUS_IN_PROCESS, percent, log, "")
 
 		percent = 11
-		deployCommands := getDeployCommands(osRelease)
+		deployCommands := getDeployCommands(osRelease, creds.Login, creds.Password)
 		if deployCommands == nil {
 			progressRec.commitTaskProcess(models.STATUS_ERROR, percent, log, ucase.ErrUnsupportedOS.Error())
 			return ucase.ErrUnsupportedOS
@@ -123,10 +123,7 @@ func (u *DeployAppUsecase) DeployAppProcessTask(creds *models.SshCreds, progress
 		for _, command := range deployCommands {
 			output, err := cc.Exec(command.String())
 			log = pushToLog(log, []byte(command.Command), output)
-			//fmt.Println(command.Command)
-			//fmt.Println(string(output))
 			if err != nil {
-				//fmt.Println(err.Error())
 				switch {
 				case errors.Is(err, cconn.ErrExitStatus):
 					{
