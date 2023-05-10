@@ -32,7 +32,7 @@ func getDeployCommands(release cl2.OSRelease, user, password string) []cl.Comman
 				os.LoadWebResource(HUGINN_BINARY_URL_U2204, binaryPath),
 				os.Chmod777(binaryPath),
 				os.CreateFile(outputPath),
-				os.RunBinaryNohupBackground(binaryPath, outputPath).WithArgs("--user="+user, "--password="+password),
+				os.RunBinaryNohupBackground(os.RunBinaryCommand(binaryPath).WithArgs("--user="+user, "--password="+password), outputPath),
 			}
 		}
 
@@ -46,7 +46,7 @@ func getDeployCommands(release cl2.OSRelease, user, password string) []cl.Comman
 				os.LoadWebResource(HUGINN_BINARY_URL_U2004, binaryPath),
 				os.Chmod777(binaryPath),
 				os.CreateFile(outputPath),
-				os.RunBinaryNohupBackground(binaryPath, outputPath).WithArgs("--user="+user, "--password="+password),
+				os.RunBinaryNohupBackground(os.RunBinaryCommand(binaryPath).WithArgs("--user="+user, "--password="+password), outputPath),
 			}
 		}
 	default:

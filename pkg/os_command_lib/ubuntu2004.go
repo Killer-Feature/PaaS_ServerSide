@@ -19,9 +19,9 @@ func (_ Ubuntu2004CommandLib) RunBinaryCommand(path string) cl.CommandAndParser 
 	}
 }
 
-func (u Ubuntu2004CommandLib) RunBinaryNohupBackground(path string, output string) cl.CommandAndParser {
+func (u Ubuntu2004CommandLib) RunBinaryNohupBackground(command cl.CommandAndParser, output string) cl.CommandAndParser {
 	return cl.CommandAndParser{
-		Command:   cl.Command(fmt.Sprintf("sudo nohup ./%s > %s 2>&1 &", path, output)),
+		Command:   cl.Command(fmt.Sprintf("sudo nohup %s > %s 2>&1 &", string(command.Command), output)),
 		Parser:    nil,
 		Condition: cl.Required,
 	}
