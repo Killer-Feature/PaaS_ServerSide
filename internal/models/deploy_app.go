@@ -11,7 +11,7 @@ type SshCreds struct {
 type SshDeployAppReq struct {
 	IP       string `json:"ip"`
 	Port     uint16 `json:"port"`
-	Login    string `json:"user"`
+	Login    string `json:"login"`
 	Password string `json:"password"`
 }
 
